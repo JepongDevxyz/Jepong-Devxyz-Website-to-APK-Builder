@@ -405,6 +405,9 @@ import android.widget.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.mozilla.geckoview.*;
+import org.mozilla.geckoview.GeckoSession.PermissionDelegate.ContentPermission;
+import org.mozilla.geckoview.GeckoSession.PermissionDelegate.MediaSource;
+import org.mozilla.geckoview.GeckoSession.PermissionDelegate.MediaCallback;
 
 public class MainActivity extends Activity {
 
