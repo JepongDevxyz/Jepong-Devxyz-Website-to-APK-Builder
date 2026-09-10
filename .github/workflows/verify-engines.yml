@@ -55,6 +55,32 @@ jobs:
       - name: Run generator tests
         run: npm test
 
+      - name: Create CI build configuration
+        shell: bash
+        run: |
+          mkdir -p builds
+          cat > "builds/$BUILD_ID.json" <<EOF
+          {
+            "websiteUrl": "https://example.com",
+            "appName": "Jepong Devxyz CI",
+            "packageName": "com.jepongdevxyz.app",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "engine": "$ENGINE",
+            "renderMode": "default",
+            "orientation": "auto",
+            "permissions": ["camera", "notification", "media", "bluetooth"],
+            "controls": ["hideScrollbars", "transparentNav"],
+            "extensions": [],
+            "oneSignalAppId": "11111111-1111-1111-1111-111111111111",
+            "offlineFallback": "Offline",
+            "iconDataUrl": "",
+            "splashDataUrl": "",
+            "splashEnabled": true,
+            "splashDuration": 1500
+          }
+          EOF
+
       - name: Validate build configuration
         run: node scripts/build.mjs prepare --build-id "$BUILD_ID"
 
