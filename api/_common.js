@@ -33,6 +33,23 @@ export function validateConfig(config) {
   const code = Number(config.versionCode);
   if (!Number.isInteger(code) || code < 1) errors.push('Version code must be a positive integer');
   if (!/^\d+(\.\d+){0,3}([+-][A-Za-z0-9.-]+)?$/.test(String(config.versionName || ''))) errors.push('Invalid version name');
+  if (
+    config.sizeOptimization != null &&
+    typeof config.sizeOptimization !== 'boolean'
+  ) errors.push('Invalid size optimization value');
+
+  const abiTarget =
+    String(config.abiTarget || 'universal');
+
+  if (
+    !['universal','arm64-v8a'].includes(abiTarget)
+  ) errors.push('Invalid ABI target');
+
+  if (
+    config.sizeOptimization === true &&
+    config.engine !== 'gecko'
+  ) errors.push('APK size optimization is GeckoView-only');
+
   if (config.oneSignalAppId && !/^[0-9a-fA-F-]{36}$/.test(config.oneSignalAppId)) errors.push('OneSignal App ID must be a UUID');
   for (const key of ['iconDataUrl', 'splashDataUrl']) {
     const value = config[key];

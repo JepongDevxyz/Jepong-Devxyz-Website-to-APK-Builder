@@ -126,7 +126,17 @@ jobs:
         run: |
           APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
           echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+          BYTES="$(stat -c%s "$APK")"
+
+          echo "size_bytes=$BYTES" >> "$GITHUB_OUTPUT"
+
+          echo "RAW GENERATED APK SIZE:"
           ls -lh "$APK"
+
+          awk -v b="$BYTES" 'BEGIN {
+            printf "Raw APK size: %.2f MiB\n", b / 1048576
+          }'
 
       - name: Read APK signing option
         id: signing

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { write, mkdir, escXml, javaString, brandedAsset } from './common.mjs';
 
@@ -45,6 +46,43 @@ export function writeNative(cfg, out, gecko=false) {
   const oneSignal = cfg.oneSignalAppId ? `implementation("com.onesignal:OneSignal:5.9.8")` : '';
   const geckoDep = gecko ? `implementation("org.mozilla.geckoview:geckoview:154.0.20260824154132")` : '';
   write(path.join(out, 'app/build.gradle.kts'), `plugins { id("com.android.application") }\n\nandroid {\n    namespace = "${pkg}"\n    ${gecko ? 'compileSdk { version = release(37) { minorApiLevel = 1 } }' : 'compileSdk = 36'}\n    defaultConfig {\n        applicationId = "${pkg}"\n        ${gecko ? 'minSdk = 26' : 'minSdk = 24'}\n        targetSdk = 36\n        versionCode = ${Number(cfg.versionCode)}\n        versionName = ${JSON.stringify(cfg.versionName)}\n    }\n    buildTypes { release { isMinifyEnabled = false } }\n    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }\n}\n\ndependencies {\n    ${geckoDep}\n    ${oneSignal}\n}\n`);
+  // Gecko ARM64 APK size optimization.
+  // Without an ABI filter Android packages every available Gecko native ABI.
+  if (
+    gecko &&
+    cfg.sizeOptimization === true &&
+    cfg.abiTarget === 'arm64-v8a'
+  ) {
+    const gradlePath=
+      path.join(out,'app/build.gradle.kts');
+
+    let gradle=
+      fs.readFileSync(
+        gradlePath,
+        'utf8'
+      );
+
+    const marker=
+      `        versionName = ${JSON.stringify(cfg.versionName)}\n    }`;
+
+    if(!gradle.includes(marker)){
+      throw new Error(
+        'Unable to inject Gecko ARM64 ABI filter'
+      );
+    }
+
+    gradle=
+      gradle.replace(
+        marker,
+        `        versionName = ${JSON.stringify(cfg.versionName)}\n        ndk { abiFilters += listOf("arm64-v8a") }\n    }`
+      );
+
+    fs.writeFileSync(
+      gradlePath,
+      gradle
+    );
+  }
+
   const orientation = cfg.orientation === 'portrait' ? 'portrait' : cfg.orientation === 'landscape' ? 'landscape' : 'unspecified';
   const hardware = cfg.renderMode === 'software' ? 'false' : 'true';
   const appClass = cfg.oneSignalAppId ? `android:name=".JepongApplication"` : '';

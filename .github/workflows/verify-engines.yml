@@ -66,6 +66,9 @@ jobs:
 
           PERMISSIONS='["camera","microphone","notification","location","media","contacts","calendar","biometrics","files","bluetooth","sensors"]'
 
+          SIZE_OPTIMIZATION=false
+          ABI_TARGET="universal"
+
           case "$ENGINE" in
             native)
               CONTROLS='["pullRefresh","hideScrollbars","transparentNav","pinchZoom","disableCopy","blockAdsRedirects"]'
@@ -74,6 +77,8 @@ jobs:
             gecko)
               CONTROLS='["transparentNav"]'
               EXTENSIONS='["adguard","ghostery","privacyBadger","darkReader","ublock"]'
+              SIZE_OPTIMIZATION=true
+              ABI_TARGET="arm64-v8a"
               ;;
             capacitor|cordova)
               CONTROLS='["transparentNav","pinchZoom"]'
@@ -98,7 +103,9 @@ jobs:
             "iconDataUrl": "",
             "splashDataUrl": "",
             "splashEnabled": true,
-            "splashDuration": 1500
+            "splashDuration": 1500,
+            "sizeOptimization": $SIZE_OPTIMIZATION,
+            "abiTarget": "$ABI_TARGET"
           }
           EOF
 
@@ -165,7 +172,17 @@ jobs:
         run: |
           APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
           echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+          BYTES="$(stat -c%s "$APK")"
+
+          echo "size_bytes=$BYTES" >> "$GITHUB_OUTPUT"
+
+          echo "RAW APK SIZE:"
           ls -lh "$APK"
+
+          awk -v b="$BYTES" 'BEGIN {
+            printf "Raw APK size: %.2f MiB\n", b / 1048576
+          }'
 
       - name: Upload verified APK
         uses: actions/upload-artifact@v7

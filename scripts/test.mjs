@@ -29,10 +29,41 @@ const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName
 for(const engine of ['native','gecko','capacitor','cordova']){
   const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav']:['transparentNav','pinchZoom'];
   const extensions=engine==='gecko'?geckoExtensions:[];
-  fs.writeFileSync(path.join(root,'builds',`${id}.json`),JSON.stringify({...base,engine,controls,extensions}));
+  const sizeOptimization=engine==='gecko';
+  const abiTarget=sizeOptimization?'arm64-v8a':'universal';
+  fs.writeFileSync(
+    path.join(root,'builds',`${id}.json`),
+    JSON.stringify({
+      ...base,
+      engine,
+      controls,
+      extensions,
+      sizeOptimization,
+      abiTarget
+    })
+  );
   let r=spawnSync(process.execPath,['scripts/build.mjs','prepare','--build-id',id],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${engine} prepare: ${r.stderr}`);
   r=spawnSync(process.execPath,['scripts/build.mjs','generate','--build-id',id],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${engine} generate: ${r.stderr}`);
   const dir=path.join(root,'work',id,'project'); if(!fs.existsSync(dir)) throw new Error(`${engine}: no project`);
+  if(engine==='gecko'){
+    const gradle=
+      fs.readFileSync(
+        path.join(
+          dir,
+          'app/build.gradle.kts'
+        ),
+        'utf8'
+      );
+
+    if(
+      !gradle.includes('abiFilters') ||
+      !gradle.includes('arm64-v8a')
+    ){
+      throw new Error(
+        'gecko: ARM64 ABI filter missing'
+      );
+    }
+  }
   if(engine==='native'||engine==='gecko'){
     if(!fs.existsSync(path.join(dir,'app/src/main/AndroidManifest.xml'))) throw new Error(`${engine}: no manifest`);
     for(const a of ['app_icon.png','app_splash.png']) if(!fs.existsSync(path.join(dir,'app/src/main/res/drawable-nodpi',a))) throw new Error(`${engine}: missing ${a}`);

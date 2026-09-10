@@ -316,6 +316,63 @@
             </label>
           </div>
         </section>
+
+        <section class="card size-opt-card" id="sizeOptimizationCard">
+          <div class="head split">
+            <div>
+              <span>STEP 5</span>
+              <h2 class="size-opt-title">
+                <i data-lucide="package-check"></i>
+                APK Size Optimization
+              </h2>
+              <p>
+                Reduce GeckoView APK size by packaging only the selected CPU architecture.
+              </p>
+            </div>
+
+            <span class="size-opt-badge">
+              <i data-lucide="cpu"></i>
+              GeckoView
+            </span>
+          </div>
+
+          <div class="form-grid compact">
+            <label class="switch full size-opt-switch">
+              <span>
+                <b class="setting-title">
+                  <i data-lucide="shrink"></i>
+                  Optimize APK size
+                </b>
+                <small>
+                  Removes unnecessary Gecko native libraries for other CPU architectures.
+                </small>
+              </span>
+
+              <input id="sizeOptimization" type="checkbox" checked>
+              <i></i>
+            </label>
+
+            <label class="field full">
+              <span>CPU architecture</span>
+
+              <select id="abiTarget">
+                <option value="arm64-v8a" selected>
+                  ARM64-v8a — Recommended
+                </option>
+
+                <option value="universal">
+                  Universal — Maximum compatibility, very large APK
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="note size-opt-note" id="sizeOptimizationNote">
+            ARM64-v8a keeps only the ARM64 Gecko native libraries.
+            Exact APK size reduction will be measured by GitHub Actions.
+          </div>
+        </section>
+
       </section>
 
       <aside class="side-col">

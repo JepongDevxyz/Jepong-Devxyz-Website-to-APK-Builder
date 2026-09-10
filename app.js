@@ -253,8 +253,56 @@ function updateCompat(){
 
   $('#compatNote').textContent=META[eng].note;
 
+  updateSizeOptimizationUI();
   updateCount();
   refreshIcons();
+}
+
+function updateSizeOptimizationUI(){
+  const isGecko=
+    $('#engine').value==='gecko';
+
+  const toggle=
+    $('#sizeOptimization');
+
+  const abi=
+    $('#abiTarget');
+
+  const card=
+    $('#sizeOptimizationCard');
+
+  const note=
+    $('#sizeOptimizationNote');
+
+  if(!toggle || !abi || !card || !note){
+    return;
+  }
+
+  toggle.disabled=
+    !isGecko;
+
+  abi.disabled=
+    !isGecko ||
+    !toggle.checked;
+
+  card.classList.toggle(
+    'optimization-disabled',
+    !isGecko
+  );
+
+  if(!isGecko){
+    note.textContent=
+      'APK Size Optimization is currently needed only for GeckoView. Native, Capacitor and Cordova builds are already much smaller.';
+  }else if(toggle.checked && abi.value==='arm64-v8a'){
+    note.textContent=
+      'ARM64-v8a is recommended for modern Android phones. Only ARM64 Gecko native libraries will be packaged.';
+  }else if(toggle.checked){
+    note.textContent=
+      'Universal keeps every available Gecko CPU architecture and produces a much larger APK.';
+  }else{
+    note.textContent=
+      'Optimization is OFF. GeckoView will package all available CPU architectures.';
+  }
 }
 
 function updateCount(){
@@ -273,6 +321,22 @@ function updateCount(){
 $$('.toggle input').forEach(input=>{
   input.addEventListener('change',updateCount);
 });
+
+$('#sizeOptimization')?.addEventListener(
+  'change',
+  ()=>{
+    updateSizeOptimizationUI();
+    updateSummary();
+  }
+);
+
+$('#abiTarget')?.addEventListener(
+  'change',
+  ()=>{
+    updateSizeOptimizationUI();
+    updateSummary();
+  }
+);
 
 $$('.tab').forEach(button=>{
   button.onclick=()=>{
@@ -326,6 +390,16 @@ function collect(){
 
     apkSigner:$('#apkSigner').checked,
 
+    sizeOptimization:
+      $('#engine').value==='gecko' &&
+      $('#sizeOptimization').checked,
+
+    abiTarget:
+      $('#engine').value==='gecko' &&
+      $('#sizeOptimization').checked
+        ? $('#abiTarget').value
+        : 'universal',
+
     oneSignalAppId:val('#oneSignalAppId'),
     offlineFallback:val('#offlineFallback'),
 
@@ -368,6 +442,19 @@ function validate(c){
     c.splashDuration > 12000
   ){
     errors.push('Splash duration must be between 0 and 12 seconds');
+  }
+
+  if(
+    !['universal','arm64-v8a'].includes(c.abiTarget)
+  ){
+    errors.push('Invalid APK architecture');
+  }
+
+  if(
+    c.sizeOptimization &&
+    c.engine!=='gecko'
+  ){
+    errors.push('APK Size Optimization is currently GeckoView-only');
   }
 
   if(
@@ -419,6 +506,8 @@ function updateSummary(){
   '#splashEnabled',
   '#splashDuration',
   '#apkSigner',
+  '#sizeOptimization',
+  '#abiTarget',
   '#oneSignalAppId',
   '#offlineFallback'
 ].forEach(selector=>{
@@ -680,6 +769,16 @@ function applyConfig(config){
 
   $('#apkSigner').checked=
     config.apkSigner===true;
+
+  $('#sizeOptimization').checked=
+    config.sizeOptimization!==false;
+
+  $('#abiTarget').value=
+    ['arm64-v8a','universal'].includes(config.abiTarget)
+      ? config.abiTarget
+      : 'arm64-v8a';
+
+  updateSizeOptimizationUI();
 
   for(
     const group of
@@ -1262,6 +1361,9 @@ $('#resetBtn').onclick=()=>{
     splashEnabled:true,
     splashDuration:1500,
     apkSigner:false,
+
+    sizeOptimization:true,
+    abiTarget:'arm64-v8a',
 
     oneSignalAppId:'',
 
