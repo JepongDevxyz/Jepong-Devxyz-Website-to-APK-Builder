@@ -2,6 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import {
+  CAPABILITY_STATUS,
+  FEATURES,
+  ENGINE_CAPABILITIES,
+  getCapability,
+  getSelectableFeatureIds,
+  validateCapabilitySelection
+} from '../capabilities.mjs';
+
 const root=path.resolve(process.cwd());
 const required=['index.html','app.js','styles.css','assets/default-icon.png','assets/default-splash.png','api/build-create.js','api/build-status.js','api/build-download.js','.github/workflows/build-apk.yml','scripts/build.mjs','scripts/patch-android-platform.mjs'];
 for(const f of required) if(!fs.existsSync(path.join(root,f))) throw new Error(`Missing ${f}`);
@@ -19,6 +28,120 @@ for(const requiredSignerToken of [
 ]){
   if(!workflowText.includes(requiredSignerToken)){
     throw new Error(`APK signer workflow missing ${requiredSignerToken}`);
+  }
+}
+
+
+/* Canonical engine capability registry assertions */
+{
+  if(CAPABILITY_STATUS.VERIFIED!=='verified'){
+    throw new Error('capability status verified missing');
+  }
+
+  for(const engine of ['native','gecko','capacitor','cordova']){
+    if(!ENGINE_CAPABILITIES[engine]){
+      throw new Error(`capability registry missing engine: ${engine}`);
+    }
+
+    for(const group of ['permissions','controls','extensions']){
+      if(!ENGINE_CAPABILITIES[engine][group]){
+        throw new Error(`${engine}: capability group missing ${group}`);
+      }
+
+      for(const feature of FEATURES[group]){
+        if(!ENGINE_CAPABILITIES[engine][group][feature.id]){
+          throw new Error(
+            `${engine}: capability missing ${group}/${feature.id}`
+          );
+        }
+      }
+    }
+  }
+
+  for(const id of [
+    'camera',
+    'microphone',
+    'notification',
+    'location',
+    'files'
+  ]){
+    if(!FEATURES.permissions.some(feature=>feature.id===id)){
+      throw new Error(`permission definition missing: ${id}`);
+    }
+  }
+
+  if(
+    getCapability('gecko','permissions','camera').status!==
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Gecko camera runtime verification missing');
+  }
+
+  if(
+    getCapability('gecko','permissions','microphone').status!==
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Gecko microphone runtime verification missing');
+  }
+
+  if(
+    getCapability('gecko','permissions','location').status!==
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Gecko location runtime verification missing');
+  }
+
+  if(
+    getCapability('gecko','controls','externalLinks').status!==
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Gecko external-links runtime verification missing');
+  }
+
+  if(
+    getCapability('native','permissions','contacts').status===
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Native Contacts falsely marked Verified');
+  }
+
+  if(
+    getCapability('capacitor','permissions','calendar').status===
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Capacitor Calendar falsely marked Verified');
+  }
+
+  if(
+    getCapability('cordova','permissions','biometrics').status===
+      CAPABILITY_STATUS.VERIFIED
+  ){
+    throw new Error('Cordova Biometrics falsely marked Verified');
+  }
+
+  if(
+    getSelectableFeatureIds(
+      'gecko',
+      'permissions'
+    ).includes('notification')
+  ){
+    throw new Error(
+      'Gecko notification must stay non-selectable until verification'
+    );
+  }
+
+  const errors=
+    validateCapabilitySelection({
+      engine:'native',
+      permissions:['contacts'],
+      controls:[],
+      extensions:[]
+    });
+
+  if(errors.length===0){
+    throw new Error(
+      'non-verified Native Contacts selection was accepted'
+    );
   }
 }
 
