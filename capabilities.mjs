@@ -191,6 +191,15 @@ native.controls.externalLinks=
     'User-clicked off-site links are routed to Android external apps; Android CI and physical runtime verification are pending'
   );
 
+native.controls.downloadManager=
+  cap(
+    E,
+    'android-download-manager',
+    false,
+    false,
+    'HTTP/HTTPS downloads use Android DownloadManager with WebView cookies; Android CI and physical runtime verification are pending'
+  );
+
 /* -------------------------------------------------
    GeckoView
    Camera, microphone and location have already been
