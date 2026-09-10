@@ -1,0 +1,45 @@
+{
+  "websiteUrl": "https://pinoymovieshub.win",
+  "appName": "No Ads",
+  "packageName": "com.jepongdevxyz.app",
+  "versionName": "1.9.6",
+  "versionCode": 58,
+  "engine": "gecko",
+  "renderMode": "hardware",
+  "orientation": "auto",
+  "permissions": [
+    "camera",
+    "microphone",
+    "notification",
+    "location",
+    "media",
+    "contacts",
+    "calendar",
+    "biometrics",
+    "files",
+    "bluetooth",
+    "sensors"
+  ],
+  "controls": [
+    "transparentNav"
+  ],
+  "extensions": [
+    "adguard",
+    "ghostery",
+    "privacyBadger",
+    "darkReader",
+    "ublock"
+  ],
+  "splashEnabled": true,
+  "splashDuration": 6000,
+  "apkSigner": true,
+  "sizeOptimization": true,
+  "abiTarget": "arm64-v8a",
+  "oneSignalAppId": "",
+  "offlineFallback": "You appear to be offline. Check your connection and try again.",
+  "iconDataUrl": "",
+  "splashDataUrl": "",
+  "buildId": "jpx-mtvc7yl2-776240",
+  "createdAt": "2026-09-10T09:41:16.118Z",
+  "schemaVersion": 1
+}
