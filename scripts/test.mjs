@@ -8,10 +8,24 @@ for(const f of required) if(!fs.existsSync(path.join(root,f))) throw new Error(`
 const checks=['app.js','api/_common.js','api/_github.js','api/build-create.js','api/build-status.js','api/build-logs.js','api/build-download.js','scripts/build.mjs','scripts/common.mjs','scripts/write-native.mjs','scripts/write-capacitor.mjs','scripts/write-cordova.mjs','scripts/patch-android-platform.mjs'];
 for(const f of checks){ const r=spawnSync(process.execPath,['--check',f],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${f}: ${r.stderr}`); }
 const y=spawnSync('python3',['-c',`import yaml; yaml.safe_load(open('.github/workflows/build-apk.yml')); print('yaml ok')`],{cwd:root,encoding:'utf8'}); if(y.status!==0)throw new Error(`workflow YAML: ${y.stderr}`);
+const workflowText=fs.readFileSync(path.join(root,'.github/workflows/build-apk.yml'),'utf8');
+for(const requiredSignerToken of [
+  'apksigner',
+  'zipalign',
+  'APK_KEYSTORE_BASE64',
+  'APK_KEYSTORE_PASSWORD',
+  'APK_KEY_ALIAS',
+  'APK_KEY_PASSWORD'
+]){
+  if(!workflowText.includes(requiredSignerToken)){
+    throw new Error(`APK signer workflow missing ${requiredSignerToken}`);
+  }
+}
+
 const allPermissions=['camera','microphone','notification','location','media','contacts','calendar','biometrics','files','bluetooth','sensors'];
 const nativeControls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects'];
 const geckoExtensions=['adguard','ghostery','privacyBadger','darkReader','ublock'];
-const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:allPermissions,controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500};
+const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:allPermissions,controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500,apkSigner:true};
 for(const engine of ['native','gecko','capacitor','cordova']){
   const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav']:['transparentNav','pinchZoom'];
   const extensions=engine==='gecko'?geckoExtensions:[];

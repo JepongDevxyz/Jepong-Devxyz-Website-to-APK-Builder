@@ -312,7 +312,19 @@ function collect(){
     extensions:checked('extensions'),
 
     splashEnabled:$('#splashEnabled').checked,
-    splashDuration:Number($('#splashDuration').value),
+
+    // UI is seconds; Android generator receives milliseconds.
+    splashDuration:Math.round(
+      Math.max(
+        0,
+        Math.min(
+          12,
+          Number($('#splashDuration').value) || 0
+        )
+      ) * 1000
+    ),
+
+    apkSigner:$('#apkSigner').checked,
 
     oneSignalAppId:val('#oneSignalAppId'),
     offlineFallback:val('#offlineFallback'),
@@ -348,6 +360,14 @@ function validate(c){
 
   if(!Number.isInteger(c.versionCode) || c.versionCode<1){
     errors.push('Version code must be 1 or higher');
+  }
+
+  if(
+    !Number.isFinite(c.splashDuration) ||
+    c.splashDuration < 0 ||
+    c.splashDuration > 12000
+  ){
+    errors.push('Splash duration must be between 0 and 12 seconds');
   }
 
   if(
@@ -398,6 +418,7 @@ function updateSummary(){
   '#renderMode',
   '#splashEnabled',
   '#splashDuration',
+  '#apkSigner',
   '#oneSignalAppId',
   '#offlineFallback'
 ].forEach(selector=>{
@@ -627,7 +648,6 @@ function applyConfig(config){
     versionCode:'#versionCode',
     renderMode:'#renderMode',
     orientation:'#orientation',
-    splashDuration:'#splashDuration',
     oneSignalAppId:'#oneSignalAppId',
     offlineFallback:'#offlineFallback'
   };
@@ -645,8 +665,21 @@ function applyConfig(config){
     config.engine || 'native'
   );
 
+  // Stored value is milliseconds; UI shows seconds.
+  $('#splashDuration').value=
+    Math.max(
+      0,
+      Math.min(
+        12,
+        Number(config.splashDuration ?? 1500) / 1000
+      )
+    );
+
   $('#splashEnabled').checked=
     config.splashEnabled!==false;
+
+  $('#apkSigner').checked=
+    config.apkSigner===true;
 
   for(
     const group of
@@ -882,6 +915,28 @@ function renderTimeline(steps=[]){
     `).join('');
 }
 
+function poweredByToast(){
+  const element=document.createElement('div');
+
+  element.className='toast brand-toast';
+
+  const icon=document.createElement('i');
+  icon.setAttribute('data-lucide','sparkles');
+
+  const text=document.createElement('span');
+  text.textContent='Powered by Jepong Devxyz';
+
+  element.append(icon,text);
+  $('#toasts').append(element);
+
+  refreshIcons();
+
+  setTimeout(
+    ()=>element.remove(),
+    3600
+  );
+}
+
 async function startBuild(){
   const config=collect();
   const errors=validate(config);
@@ -984,8 +1039,10 @@ async function startBuild(){
   }
 }
 
-$('#buildBtn').onclick=
-  startBuild;
+$('#buildBtn').onclick=()=>{
+  poweredByToast();
+  startBuild();
+};
 
 async function pollStatus(config){
   clearInterval(state.poll);
@@ -1204,6 +1261,7 @@ $('#resetBtn').onclick=()=>{
 
     splashEnabled:true,
     splashDuration:1500,
+    apkSigner:false,
 
     oneSignalAppId:'',
 

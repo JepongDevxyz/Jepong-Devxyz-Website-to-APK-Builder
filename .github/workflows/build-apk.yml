@@ -51,11 +51,16 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK 36
+      - name: Install Android SDK
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+          if [ "$ENGINE" = "gecko" ]; then
+            sdkmanager               "platform-tools"               "platforms;android-37.1"               "build-tools;37.0.0"               "build-tools;36.0.0"
+          else
+            sdkmanager               "platform-tools"               "platforms;android-36"               "build-tools;36.0.0"
+          fi
 
       - name: Validate build configuration
         run: node scripts/build.mjs prepare --build-id "$BUILD_ID"
@@ -121,6 +126,53 @@ jobs:
         run: |
           APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
           echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          ls -lh "$APK"
+
+      - name: Read APK signing option
+        id: signing
+        shell: bash
+        run: |
+          ENABLED="$(node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('builds/'+process.env.BUILD_ID+'.json','utf8')); process.stdout.write(c.apkSigner===true?'true':'false')")"
+          echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"
+          echo "APK signing enabled: $ENABLED"
+
+      - name: Sign release APK with apksigner
+        if: steps.signing.outputs.enabled == 'true'
+        shell: bash
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: |
+          if [ -z "$APK_KEYSTORE_BASE64" ] ||              [ -z "$APK_KEYSTORE_PASSWORD" ] ||              [ -z "$APK_KEY_ALIAS" ] ||              [ -z "$APK_KEY_PASSWORD" ]; then
+            echo "::error::APK Signer is enabled but GitHub signing secrets are missing."
+            exit 1
+          fi
+
+          KEYSTORE="$RUNNER_TEMP/jepong-release.jks"
+          APK="${{ steps.apk.outputs.apk }}"
+          ALIGNED="${APK%.apk}-aligned.apk"
+          SIGNED="${APK%.apk}-signed.apk"
+
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+
+          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+
+          "$ZIPALIGN"             -f             -p             4             "$APK"             "$ALIGNED"
+
+          "$APKSIGNER" sign             --ks "$KEYSTORE"             --ks-key-alias "$APK_KEY_ALIAS"             --ks-pass "pass:$APK_KEYSTORE_PASSWORD"             --key-pass "pass:$APK_KEY_PASSWORD"             --out "$SIGNED"             "$ALIGNED"
+
+          "$APKSIGNER" verify             --verbose             --print-certs             "$SIGNED"
+
+          mv "$SIGNED" "$APK"
+          rm -f "$ALIGNED" "$KEYSTORE"
+
+          echo "Signed APK:"
           ls -lh "$APK"
 
       - name: Upload APK artifact

@@ -284,10 +284,24 @@
               <i></i>
             </label>
 
+            <label class="switch full signer-switch">
+              <span>
+                <b class="setting-title">
+                  <i data-lucide="badge-check"></i>
+                  APK Signer
+                </b>
+                <small>
+                  Zipalign and sign the final release APK using your private GitHub signing key.
+                </small>
+              </span>
+              <input id="apkSigner" type="checkbox">
+              <i></i>
+            </label>
+
             <label class="field">
-              <span>Splash duration (ms)</span>
+              <span>Splash duration (seconds)</span>
               <input id="splashDuration" type="number"
-                     min="0" max="10000" step="100" value="1500">
+                     min="0" max="12" step="0.5" value="1.5">
             </label>
 
             <label class="field">
