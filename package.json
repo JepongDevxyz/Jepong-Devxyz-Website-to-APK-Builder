@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node scripts/test.mjs && node scripts/test-native-toolbar.mjs",
+    "test": "node scripts/test.mjs && node scripts/test-native-toolbar.mjs && node scripts/test-native-external-links.mjs",
     "check": "node --check app.js && node --check api/build-create.js && node --check api/build-status.js && node --check api/build-logs.js && node --check api/build-download.js && node --check scripts/build.mjs"
   }
 }

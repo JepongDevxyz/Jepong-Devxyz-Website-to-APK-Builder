@@ -182,6 +182,15 @@ native.controls.navigationToolbar=
     'Native navigation toolbar generator is implemented; Android CI and physical runtime verification are pending'
   );
 
+native.controls.externalLinks=
+  cap(
+    E,
+    'native-webview-external-routing',
+    false,
+    false,
+    'User-clicked off-site links are routed to Android external apps; Android CI and physical runtime verification are pending'
+  );
+
 /* -------------------------------------------------
    GeckoView
    Camera, microphone and location have already been
