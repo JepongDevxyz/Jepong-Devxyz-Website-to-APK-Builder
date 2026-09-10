@@ -88,6 +88,58 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     assertPatched(dir,'platforms/android');
   }
 }
+
+/* Gecko runtime diagnostics assertions */
+{
+  const geckoMain=
+    fs.readFileSync(
+      path.join(
+        root,
+        'work',
+        'test-gecko',
+        'project',
+        'app',
+        'src',
+        'main',
+        'java',
+        'com',
+        'jepongdevxyz',
+        'app',
+        'MainActivity.java'
+      ),
+      'utf8'
+    );
+
+  const requiredGeckoRuntimeTokens=[
+    'getSharedPreferences',
+    'controller.list()',
+    'metaData.enabled',
+    'EnableSource.APP',
+    'Retry extensions',
+    'Continue without failed extensions',
+    'Already installed',
+    'setProgressDelegate',
+    'onProgressChange',
+    'Website loading timed out',
+    'Retry website',
+    'jepong_extensions',
+    'extid_',
+    'findInstalled',
+    'prepareExtensions'
+  ];
+
+  for(
+    const token
+    of requiredGeckoRuntimeTokens
+  ){
+    if(!geckoMain.includes(token)){
+      throw new Error(
+        \`gecko runtime feature missing: \${token}\`
+      );
+    }
+  }
+}
+
 console.log('PASS: JS/YAML syntax, API modules, config validation, 4 engine generators, branding, and Capacitor/Cordova Android patch stage.');
 
 function fakePlatform(dir,engine){

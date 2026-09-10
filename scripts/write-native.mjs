@@ -131,91 +131,353 @@ function webViewActivity(cfg) {
 
 function geckoActivity(cfg) {
   const extMap={
-    adguard:{slug:'adguard-adblocker',label:'AdGuard'},
-    ghostery:{slug:'ghostery',label:'Ghostery'},
-    privacyBadger:{slug:'privacy-badger17',label:'Privacy Badger'},
-    darkReader:{slug:'darkreader',label:'Dark Reader'},
-    ublock:{slug:'ublock-origin',label:'uBlock Origin'}
+    adguard:{
+      slug:'adguard-adblocker',
+      label:'AdGuard'
+    },
+    ghostery:{
+      slug:'ghostery',
+      label:'Ghostery'
+    },
+    privacyBadger:{
+      slug:'privacy-badger17',
+      label:'Privacy Badger'
+    },
+    darkReader:{
+      slug:'darkreader',
+      label:'Dark Reader'
+    },
+    ublock:{
+      slug:'ublock-origin',
+      label:'uBlock Origin'
+    }
   };
 
   const selected=(cfg.extensions||[])
-    .map(x=>extMap[x])
-    .filter(Boolean);
+    .map(key=>({
+      key,
+      ...(extMap[key]||{})
+    }))
+    .filter(x=>x.slug);
 
-  const extensionRows=selected.map(x=>
-    `urls.add("https://addons.mozilla.org/firefox/downloads/latest/${x.slug}/latest.xpi");
-    names.add(${javaString(x.label)});`
-  ).join('\n    ');
+  const extensionRows=selected.map(x=>\`
+    keys.add(\${javaString(x.key)});
+    slugs.add(\${javaString(x.slug)});
+    names.add(\${javaString(x.label)});
+    urls.add("https://addons.mozilla.org/firefox/downloads/latest/\${x.slug}/latest.xpi");
+  \`).join('\\n');
 
-  const transparent=(cfg.controls||[]).includes('transparentNav');
-  const hard=cfg.renderMode==='hardware';
+  const transparent=
+    (cfg.controls||[])
+      .includes('transparentNav');
 
-  return `package ${cfg.packageName};
+  const hard=
+    cfg.renderMode==='hardware';
+
+  return \`package \${cfg.packageName};
 
 import android.Manifest;
 import android.app.Activity;
 import android.os.*;
 import android.graphics.Color;
 import android.view.*;
+import android.content.*;
 import android.content.pm.PackageManager;
 import android.widget.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.mozilla.geckoview.*;
 
 public class MainActivity extends Activity {
+
+  final String HOME=\${javaString(cfg.websiteUrl)};
+
   GeckoRuntime runtime;
   GeckoSession session;
   GeckoView view;
 
   FrameLayout root;
   LinearLayout loader;
+  LinearLayout diagnostics;
+
   ProgressBar loadingBar;
   TextView loadingStatus;
   TextView loadingCount;
 
+  Button retryButton;
+  Button continueButton;
+
+  final ArrayList<TextView> extensionRows=
+    new ArrayList<>();
+
+  SharedPreferences extensionPrefs;
+
   boolean started=false;
-  int extensionTotal=0;
-  final java.util.concurrent.atomic.AtomicInteger extensionDone=
-    new java.util.concurrent.atomic.AtomicInteger(0);
+
+  AtomicInteger extensionDone=
+    new AtomicInteger(0);
+
+  AtomicInteger extensionReady=
+    new AtomicInteger(0);
+
+  AtomicInteger extensionFailed=
+    new AtomicInteger(0);
+
+  Handler timeoutHandler=
+    new Handler(Looper.getMainLooper());
+
+  Runnable websiteTimeout;
 
   @Override
-  public void onCreate(Bundle b){
-    super.onCreate(b);
+  public void onCreate(Bundle state){
+    super.onCreate(state);
 
-    ${transparent ? `
+    \${transparent ? \`
     if(Build.VERSION.SDK_INT>=29){
-      getWindow().setNavigationBarColor(Color.TRANSPARENT);
-      getWindow().setStatusBarColor(Color.TRANSPARENT);
-    }` : ''}
+      getWindow()
+        .setNavigationBarColor(
+          Color.TRANSPARENT
+        );
+
+      getWindow()
+        .setStatusBarColor(
+          Color.TRANSPARENT
+        );
+    }\` : ''}
 
     begin();
   }
 
-  ${splashMethods(cfg)}
+  \${splashMethods(cfg)}
 
   int dp(int value){
     return (int)(
-      value * getResources().getDisplayMetrics().density + 0.5f
+      value *
+      getResources()
+        .getDisplayMetrics()
+        .density
+      + 0.5f
     );
   }
 
-  TextView loaderText(String value,float size,int color){
-    TextView t=new TextView(this);
-    t.setText(value);
-    t.setTextSize(size);
-    t.setTextColor(color);
-    t.setGravity(Gravity.CENTER);
-    return t;
+  TextView makeText(
+    String value,
+    float size,
+    int color
+  ){
+    TextView text=
+      new TextView(this);
+
+    text.setText(value);
+    text.setTextSize(size);
+    text.setTextColor(color);
+    text.setGravity(Gravity.CENTER);
+
+    return text;
   }
 
-  void showLoader(int total){
-    extensionTotal=total;
-    extensionDone.set(0);
+  void startBrowser(){
+    if(started){
+      return;
+    }
 
-    root=new FrameLayout(this);
+    started=true;
 
-    view=new GeckoView(this);
-    ${hard ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);' : ''}
+    extensionPrefs=
+      getSharedPreferences(
+        "jepong_extensions",
+        MODE_PRIVATE
+      );
+
+    buildBrowserScreen();
+
+    runtime=
+      GeckoRuntime.create(this);
+
+    WebExtensionController controller=
+      runtime
+        .getWebExtensionController();
+
+    controller.setPromptDelegate(
+      new WebExtensionController.PromptDelegate(){
+
+        @Override
+        public GeckoResult<
+          WebExtension.PermissionPromptResponse
+        > onInstallPromptRequest(
+          WebExtension extension,
+          String[] permissions,
+          String[] origins,
+          String[] dataCollectionPermissions
+        ){
+          return GeckoResult.fromValue(
+            new WebExtension
+              .PermissionPromptResponse(
+                true,
+                false,
+                false
+              )
+          );
+        }
+
+        @Override
+        public GeckoResult<AllowOrDeny>
+        onOptionalPrompt(
+          WebExtension extension,
+          String[] permissions,
+          String[] origins,
+          String[] dataCollectionPermissions
+        ){
+          return GeckoResult.fromValue(
+            AllowOrDeny.ALLOW
+          );
+        }
+
+        @Override
+        public GeckoResult<AllowOrDeny>
+        onUpdatePrompt(
+          WebExtension extension,
+          String[] newPermissions,
+          String[] newOrigins,
+          String[] newDataCollectionPermissions
+        ){
+          return GeckoResult.fromValue(
+            AllowOrDeny.ALLOW
+          );
+        }
+      }
+    );
+
+    session=
+      new GeckoSession();
+
+    session.setPermissionDelegate(
+      new GeckoSession.PermissionDelegate(){
+
+        @Override
+        public void onAndroidPermissionsRequest(
+          GeckoSession currentSession,
+          String[] permissions,
+          Callback callback
+        ){
+          boolean granted=true;
+
+          if(permissions!=null){
+            for(String permission:permissions){
+              if(
+                Build.VERSION.SDK_INT>=23 &&
+                checkSelfPermission(permission)
+                  !=PackageManager
+                    .PERMISSION_GRANTED
+              ){
+                granted=false;
+              }
+            }
+          }
+
+          if(granted){
+            callback.grant();
+          }else{
+            callback.reject();
+          }
+        }
+
+        @Override
+        public GeckoResult<Integer>
+        onContentPermissionRequest(
+          GeckoSession currentSession,
+          ContentPermission permission
+        ){
+          return GeckoResult.fromValue(
+            ContentPermission.VALUE_ALLOW
+          );
+        }
+
+        @Override
+        public void onMediaPermissionRequest(
+          GeckoSession currentSession,
+          String uri,
+          MediaSource[] video,
+          MediaSource[] audio,
+          MediaCallback callback
+        ){
+          MediaSource selectedVideo=
+            video!=null &&
+            video.length>0
+              ? video[0]
+              : null;
+
+          MediaSource selectedAudio=
+            audio!=null &&
+            audio.length>0
+              ? audio[0]
+              : null;
+
+          callback.grant(
+            selectedVideo,
+            selectedAudio
+          );
+        }
+      }
+    );
+
+    session.setProgressDelegate(
+      new GeckoSession.ProgressDelegate(){
+
+        @Override
+        public void onPageStart(
+          GeckoSession currentSession,
+          String url
+        ){
+          beginWebsiteTimeout();
+
+          setWebsiteProgress(0);
+        }
+
+        @Override
+        public void onProgressChange(
+          GeckoSession currentSession,
+          int progress
+        ){
+          setWebsiteProgress(progress);
+        }
+
+        @Override
+        public void onPageStop(
+          GeckoSession currentSession,
+          boolean success
+        ){
+          cancelWebsiteTimeout();
+
+          if(success){
+            finishLoader();
+          }else{
+            showWebsiteError(
+              "Website could not be loaded."
+            );
+          }
+        }
+      }
+    );
+
+    session.open(runtime);
+
+    view.setSession(session);
+
+    prepareExtensions(controller);
+  }
+
+  void buildBrowserScreen(){
+
+    root=
+      new FrameLayout(this);
+
+    view=
+      new GeckoView(this);
+
+    \${hard
+      ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);'
+      : ''}
 
     root.addView(
       view,
@@ -225,79 +487,222 @@ public class MainActivity extends Activity {
       )
     );
 
-    loader=new LinearLayout(this);
-    loader.setOrientation(LinearLayout.VERTICAL);
-    loader.setGravity(Gravity.CENTER);
-    loader.setPadding(dp(28),dp(28),dp(28),dp(28));
-    loader.setBackgroundColor(Color.rgb(17,24,39));
-    loader.setElevation(dp(8));
+    loader=
+      new LinearLayout(this);
 
-    ImageView icon=new ImageView(this);
-    icon.setImageResource(R.drawable.app_icon);
-    icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+    loader.setOrientation(
+      LinearLayout.VERTICAL
+    );
+
+    loader.setGravity(
+      Gravity.CENTER
+    );
+
+    loader.setPadding(
+      dp(28),
+      dp(32),
+      dp(28),
+      dp(32)
+    );
+
+    loader.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    ImageView icon=
+      new ImageView(this);
+
+    icon.setImageResource(
+      R.drawable.app_icon
+    );
+
+    icon.setScaleType(
+      ImageView.ScaleType.CENTER_INSIDE
+    );
 
     LinearLayout.LayoutParams iconParams=
-      new LinearLayout.LayoutParams(dp(112),dp(112));
-    iconParams.bottomMargin=dp(24);
-    loader.addView(icon,iconParams);
+      new LinearLayout.LayoutParams(
+        dp(100),
+        dp(100)
+      );
 
-    TextView title=loaderText(
-      ${javaString(cfg.appName)},
-      24f,
-      Color.WHITE
+    iconParams.bottomMargin=
+      dp(18);
+
+    loader.addView(
+      icon,
+      iconParams
     );
+
+    TextView appTitle=
+      makeText(
+        \${javaString(cfg.appName)},
+        23f,
+        Color.WHITE
+      );
 
     LinearLayout.LayoutParams titleParams=
       new LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
       );
-    titleParams.bottomMargin=dp(8);
-    loader.addView(title,titleParams);
 
-    loadingStatus=loaderText(
-      total>0
-        ? "Preparing secure browser..."
-        : "Starting browser engine...",
-      15f,
-      Color.rgb(209,213,219)
+    titleParams.bottomMargin=
+      dp(6);
+
+    loader.addView(
+      appTitle,
+      titleParams
     );
+
+    loadingStatus=
+      makeText(
+        "Preparing secure browser...",
+        15f,
+        Color.rgb(
+          209,
+          213,
+          219
+        )
+      );
 
     LinearLayout.LayoutParams statusParams=
       new LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
       );
-    statusParams.bottomMargin=dp(20);
-    loader.addView(loadingStatus,statusParams);
 
-    loadingBar=new ProgressBar(
-      this,
-      null,
-      android.R.attr.progressBarStyleHorizontal
+    statusParams.bottomMargin=
+      dp(16);
+
+    loader.addView(
+      loadingStatus,
+      statusParams
     );
+
+    loadingBar=
+      new ProgressBar(
+        this,
+        null,
+        android.R.attr
+          .progressBarStyleHorizontal
+      );
+
     loadingBar.setMax(100);
-    loadingBar.setProgress(total>0 ? 0 : 80);
+    loadingBar.setProgress(0);
     loadingBar.setIndeterminate(false);
 
-    LinearLayout.LayoutParams barParams=
+    LinearLayout.LayoutParams progressParams=
       new LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         dp(8)
       );
-    barParams.setMargins(dp(18),0,dp(18),dp(14));
-    loader.addView(loadingBar,barParams);
 
-    loadingCount=loaderText(
-      total>0
-        ? "0 / "+total+" extensions ready"
-        : "Loading website...",
-      13f,
-      Color.rgb(156,163,175)
+    progressParams.setMargins(
+      dp(12),
+      0,
+      dp(12),
+      dp(10)
     );
 
     loader.addView(
+      loadingBar,
+      progressParams
+    );
+
+    loadingCount=
+      makeText(
+        "Checking browser protection...",
+        13f,
+        Color.rgb(
+          156,
+          163,
+          175
+        )
+      );
+
+    LinearLayout.LayoutParams countParams=
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      );
+
+    countParams.bottomMargin=
+      dp(16);
+
+    loader.addView(
       loadingCount,
+      countParams
+    );
+
+    diagnostics=
+      new LinearLayout(this);
+
+    diagnostics.setOrientation(
+      LinearLayout.VERTICAL
+    );
+
+    diagnostics.setPadding(
+      dp(8),
+      dp(4),
+      dp(8),
+      dp(8)
+    );
+
+    loader.addView(
+      diagnostics,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      )
+    );
+
+    retryButton=
+      new Button(this);
+
+    retryButton.setText(
+      "Retry extensions"
+    );
+
+    retryButton.setVisibility(
+      View.GONE
+    );
+
+    LinearLayout.LayoutParams retryParams=
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      );
+
+    retryParams.setMargins(
+      0,
+      dp(12),
+      0,
+      dp(6)
+    );
+
+    loader.addView(
+      retryButton,
+      retryParams
+    );
+
+    continueButton=
+      new Button(this);
+
+    continueButton.setText(
+      "Continue without failed extensions"
+    );
+
+    continueButton.setVisibility(
+      View.GONE
+    );
+
+    loader.addView(
+      continueButton,
       new LinearLayout.LayoutParams(
         LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -315,373 +720,884 @@ public class MainActivity extends Activity {
     setContentView(root);
   }
 
-  void startBrowser(){
-    if(started)return;
-    started=true;
-
-    showLoader(${selected.length});
-
-    runtime=GeckoRuntime.create(this);
-
-    WebExtensionController controller=
-      runtime.getWebExtensionController();
-
-    controller.setPromptDelegate(
-      new WebExtensionController.PromptDelegate(){
-
-        @Override
-        public GeckoResult<WebExtension.PermissionPromptResponse>
-        onInstallPromptRequest(
-          WebExtension extension,
-          String[] permissions,
-          String[] origins,
-          String[] dataCollectionPermissions
-        ){
-          return GeckoResult.fromValue(
-            new WebExtension.PermissionPromptResponse(
-              true,
-              false,
-              false
-            )
-          );
-        }
-
-        @Override
-        public GeckoResult<AllowOrDeny> onOptionalPrompt(
-          WebExtension extension,
-          String[] permissions,
-          String[] origins,
-          String[] dataCollectionPermissions
-        ){
-          return GeckoResult.fromValue(AllowOrDeny.ALLOW);
-        }
-
-        @Override
-        public GeckoResult<AllowOrDeny> onUpdatePrompt(
-          WebExtension extension,
-          String[] newPermissions,
-          String[] newOrigins,
-          String[] newDataCollectionPermissions
-        ){
-          return GeckoResult.fromValue(AllowOrDeny.ALLOW);
-        }
-      }
-    );
-
-    session=new GeckoSession();
-
-    session.setPermissionDelegate(
-      new GeckoSession.PermissionDelegate(){
-
-        @Override
-        public void onAndroidPermissionsRequest(
-          GeckoSession s,
-          String[] permissions,
-          Callback cb
-        ){
-          boolean ok=true;
-
-          if(permissions!=null){
-            for(String x:permissions){
-              if(
-                Build.VERSION.SDK_INT>=23 &&
-                checkSelfPermission(x)
-                  !=PackageManager.PERMISSION_GRANTED
-              ){
-                ok=false;
-              }
-            }
-          }
-
-          if(ok) cb.grant();
-          else cb.reject();
-        }
-
-        @Override
-        public GeckoResult<Integer> onContentPermissionRequest(
-          GeckoSession s,
-          ContentPermission perm
-        ){
-          return GeckoResult.fromValue(
-            ContentPermission.VALUE_ALLOW
-          );
-        }
-
-        @Override
-        public void onMediaPermissionRequest(
-          GeckoSession s,
-          String uri,
-          MediaSource[] video,
-          MediaSource[] audio,
-          MediaCallback cb
-        ){
-          MediaSource v=
-            (video!=null&&video.length>0)
-              ? video[0]
-              : null;
-
-          MediaSource a=
-            (audio!=null&&audio.length>0)
-              ? audio[0]
-              : null;
-
-          cb.grant(v,a);
-        }
-      }
-    );
-
-    session.setProgressDelegate(
-      new GeckoSession.ProgressDelegate(){
-
-        @Override
-        public void onPageStart(
-          GeckoSession s,
-          String url
-        ){
-          updateWebsiteProgress(0);
-        }
-
-        @Override
-        public void onProgressChange(
-          GeckoSession s,
-          int progress
-        ){
-          updateWebsiteProgress(progress);
-        }
-
-        @Override
-        public void onPageStop(
-          GeckoSession s,
-          boolean success
-        ){
-          finishLoader(success);
-        }
-      }
-    );
-
-    session.open(runtime);
-    view.setSession(session);
-
-    installExtensionsThenLoad(controller);
-  }
-
-  void updateExtensionProgress(
-    String name,
-    boolean newlyInstalled
-  ){
-    int done=extensionDone.incrementAndGet();
-
-    int pct=
-      extensionTotal<=0
-        ? 80
-        : Math.min(
-            80,
-            Math.round(
-              (done*80f)/extensionTotal
-            )
-          );
-
-    runOnUiThread(()->{
-      if(loadingBar!=null)
-        loadingBar.setProgress(pct);
-
-      if(loadingStatus!=null){
-        loadingStatus.setText(
-          newlyInstalled
-            ? "✓ "+name+" ready"
-            : "Checking "+name+"..."
-        );
-      }
-
-      if(loadingCount!=null){
-        loadingCount.setText(
-          done+" / "+
-          extensionTotal+
-          " extensions checked"
-        );
-      }
-    });
-  }
-
-  void showWebsiteStarting(int installedCount){
-    runOnUiThread(()->{
-      if(loadingBar!=null)
-        loadingBar.setProgress(80);
-
-      if(loadingStatus!=null)
-        loadingStatus.setText(
-          "Extensions ready"
-        );
-
-      if(loadingCount!=null)
-        loadingCount.setText(
-          installedCount+
-          " installed • Loading website..."
-        );
-    });
-  }
-
-  void updateWebsiteProgress(int progress){
-    int safe=Math.max(
-      0,
-      Math.min(100,progress)
-    );
-
-    int overall=
-      80 + ((safe*20)/100);
-
-    runOnUiThread(()->{
-      if(loadingBar!=null)
-        loadingBar.setProgress(overall);
-
-      if(loadingStatus!=null)
-        loadingStatus.setText(
-          "Loading website..."
-        );
-
-      if(loadingCount!=null)
-        loadingCount.setText(
-          safe+"%"
-        );
-    });
-  }
-
-  void finishLoader(boolean success){
-    runOnUiThread(()->{
-      if(loadingBar!=null)
-        loadingBar.setProgress(100);
-
-      if(loadingStatus!=null)
-        loadingStatus.setText(
-          success
-            ? "✓ Ready"
-            : "Opening website..."
-        );
-
-      if(loadingCount!=null)
-        loadingCount.setText("100%");
-
-      new Handler(
-        Looper.getMainLooper()
-      ).postDelayed(()->{
-        if(
-          root!=null &&
-          loader!=null &&
-          loader.getParent()==root
-        ){
-          loader.animate()
-            .alpha(0f)
-            .setDuration(250)
-            .withEndAction(
-              ()->root.removeView(loader)
-            )
-            .start();
-        }
-      },250);
-    });
-  }
-
-  void installExtensionsThenLoad(
+  void prepareExtensions(
     WebExtensionController controller
   ){
-    final String home=${javaString(cfg.websiteUrl)};
+    hideActionButtons();
 
-    final ArrayList<String> urls=
+    extensionDone.set(0);
+    extensionReady.set(0);
+    extensionFailed.set(0);
+
+    extensionRows.clear();
+    diagnostics.removeAllViews();
+
+    final ArrayList<String> keys=
+      new ArrayList<>();
+
+    final ArrayList<String> slugs=
       new ArrayList<>();
 
     final ArrayList<String> names=
       new ArrayList<>();
 
-    ${extensionRows}
+    final ArrayList<String> urls=
+      new ArrayList<>();
 
-    if(urls.isEmpty()){
-      showWebsiteStarting(0);
-      session.loadUri(home);
+    \${extensionRows}
+
+    if(keys.isEmpty()){
+      loadingBar.setProgress(80);
+
+      loadingStatus.setText(
+        "Browser ready"
+      );
+
+      loadingCount.setText(
+        "No extensions selected"
+      );
+
+      loadWebsite();
       return;
     }
 
-    final java.util.concurrent.atomic.AtomicInteger pending=
-      new java.util.concurrent.atomic.AtomicInteger(
-        urls.size()
+    for(String name:names){
+      TextView row=
+        makeText(
+          "○ "+name+" • Checking",
+          13f,
+          Color.rgb(
+            209,
+            213,
+            219
+          )
+        );
+
+      row.setGravity(
+        Gravity.START
       );
 
-    final Runnable done=()->{
-      if(pending.decrementAndGet()==0){
+      row.setPadding(
+        dp(4),
+        dp(4),
+        dp(4),
+        dp(4)
+      );
+
+      diagnostics.addView(row);
+
+      extensionRows.add(row);
+    }
+
+    loadingCount.setText(
+      "0 / "+
+      keys.size()+
+      " extensions checked"
+    );
+
+    controller.list().accept(
+
+      installed->{
+
+        final AtomicInteger pending=
+          new AtomicInteger(
+            keys.size()
+          );
+
+        for(
+          int i=0;
+          i<keys.size();
+          i++
+        ){
+          final int index=i;
+
+          final String key=
+            keys.get(index);
+
+          final String slug=
+            slugs.get(index);
+
+          final String name=
+            names.get(index);
+
+          final String url=
+            urls.get(index);
+
+          WebExtension existing=
+            findInstalled(
+              installed,
+              key,
+              name
+            );
+
+          if(existing!=null){
+
+            extensionPrefs
+              .edit()
+              .putString(
+                "extid_"+key,
+                existing.id
+              )
+              .apply();
+
+            if(existing.metaData.enabled){
+
+              finishExtension(
+                pending,
+                index,
+                name,
+                true,
+                "Enabled"
+              );
+
+            }else{
+
+              setExtensionRow(
+                index,
+                "◌ "+name+
+                " • Enabling...",
+                Color.rgb(
+                  250,
+                  204,
+                  21
+                )
+              );
+
+              controller.enable(
+                existing,
+                WebExtensionController
+                  .EnableSource.APP
+              ).accept(
+
+                enabledExtension->{
+
+                  boolean enabled=
+                    enabledExtension
+                      .metaData
+                      .enabled;
+
+                  extensionPrefs
+                    .edit()
+                    .putString(
+                      "extid_"+key,
+                      enabledExtension.id
+                    )
+                    .apply();
+
+                  finishExtension(
+                    pending,
+                    index,
+                    name,
+                    enabled,
+                    enabled
+                      ? "Enabled"
+                      : "Disabled"
+                  );
+                },
+
+                error->{
+                  finishExtension(
+                    pending,
+                    index,
+                    name,
+                    false,
+                    "Enable failed"
+                  );
+                }
+              );
+            }
+
+            continue;
+          }
+
+          installExtension(
+            controller,
+            pending,
+            index,
+            key,
+            name,
+            url
+          );
+        }
+      },
+
+      error->{
+
+        for(
+          int i=0;
+          i<extensionRows.size();
+          i++
+        ){
+          setExtensionRow(
+            i,
+            "✕ "+
+            names.get(i)+
+            " • Check failed",
+            Color.rgb(
+              248,
+              113,
+              113
+            )
+          );
+        }
+
+        extensionFailed.set(
+          keys.size()
+        );
+
+        loadingStatus.setText(
+          "Could not inspect extensions"
+        );
+
+        loadingCount.setText(
+          "Check your internet connection"
+        );
+
+        showExtensionActions(
+          controller
+        );
+      }
+    );
+  }
+
+  WebExtension findInstalled(
+    List<WebExtension> installed,
+    String key,
+    String expectedName
+  ){
+    String savedId=
+      extensionPrefs.getString(
+        "extid_"+key,
+        ""
+      );
+
+    if(installed==null){
+      return null;
+    }
+
+    if(!savedId.isEmpty()){
+      for(WebExtension extension:installed){
+        if(
+          savedId.equals(
+            extension.id
+          )
+        ){
+          return extension;
+        }
+      }
+    }
+
+    String wanted=
+      normalizeExtensionName(
+        expectedName
+      );
+
+    for(WebExtension extension:installed){
+
+      String actual=
+        normalizeExtensionName(
+          extension.metaData.name
+        );
+
+      if(
+        !actual.isEmpty() &&
+        (
+          actual.contains(wanted) ||
+          wanted.contains(actual)
+        )
+      ){
+        return extension;
+      }
+    }
+
+    return null;
+  }
+
+  String normalizeExtensionName(
+    String value
+  ){
+    if(value==null){
+      return "";
+    }
+
+    return value
+      .toLowerCase(Locale.ROOT)
+      .replaceAll(
+        "[^a-z0-9]",
+        ""
+      );
+  }
+
+  void installExtension(
+    WebExtensionController controller,
+    AtomicInteger pending,
+    int index,
+    String key,
+    String name,
+    String url
+  ){
+    setExtensionRow(
+      index,
+      "↓ "+name+" • Installing...",
+      Color.rgb(
+        96,
+        165,
+        250
+      )
+    );
+
+    controller.install(url).accept(
+
+      extension->{
+
+        extensionPrefs
+          .edit()
+          .putString(
+            "extid_"+key,
+            extension.id
+          )
+          .apply();
+
+        if(extension.metaData.enabled){
+
+          finishExtension(
+            pending,
+            index,
+            name,
+            true,
+            "Installed & enabled"
+          );
+
+        }else{
+
+          controller.enable(
+            extension,
+            WebExtensionController
+              .EnableSource.APP
+          ).accept(
+
+            enabledExtension->{
+
+              boolean enabled=
+                enabledExtension
+                  .metaData
+                  .enabled;
+
+              finishExtension(
+                pending,
+                index,
+                name,
+                enabled,
+                enabled
+                  ? "Installed & enabled"
+                  : "Installed but disabled"
+              );
+            },
+
+            enableError->{
+              finishExtension(
+                pending,
+                index,
+                name,
+                false,
+                "Installed but enable failed"
+              );
+            }
+          );
+        }
+      },
+
+      installError->{
 
         controller.list().accept(
-          list->{
-            android.util.Log.i(
-              "JepongExt",
-              "Extensions ready: "+list.size()
-            );
 
-            showWebsiteStarting(list.size());
-            session.loadUri(home);
+          installed->{
+
+            WebExtension existing=
+              findInstalled(
+                installed,
+                key,
+                name
+              );
+
+            if(
+              existing!=null &&
+              existing.metaData.enabled
+            ){
+
+              extensionPrefs
+                .edit()
+                .putString(
+                  "extid_"+key,
+                  existing.id
+                )
+                .apply();
+
+              finishExtension(
+                pending,
+                index,
+                name,
+                true,
+                "Already installed"
+              );
+
+            }else if(existing!=null){
+
+              controller.enable(
+                existing,
+                WebExtensionController
+                  .EnableSource.APP
+              ).accept(
+
+                enabledExtension->{
+
+                  boolean enabled=
+                    enabledExtension
+                      .metaData
+                      .enabled;
+
+                  extensionPrefs
+                    .edit()
+                    .putString(
+                      "extid_"+key,
+                      enabledExtension.id
+                    )
+                    .apply();
+
+                  finishExtension(
+                    pending,
+                    index,
+                    name,
+                    enabled,
+                    enabled
+                      ? "Enabled"
+                      : "Disabled"
+                  );
+                },
+
+                enableError->{
+                  finishExtension(
+                    pending,
+                    index,
+                    name,
+                    false,
+                    "Enable failed"
+                  );
+                }
+              );
+
+            }else{
+
+              finishExtension(
+                pending,
+                index,
+                name,
+                false,
+                "Install failed"
+              );
+            }
           },
 
-          err->{
-            android.util.Log.e(
-              "JepongExt",
-              "Extension list failed",
-              err
+          listError->{
+            finishExtension(
+              pending,
+              index,
+              name,
+              false,
+              "Install failed"
             );
-
-            showWebsiteStarting(
-              extensionDone.get()
-            );
-
-            session.loadUri(home);
           }
         );
       }
-    };
+    );
+  }
 
-    for(int i=0;i<urls.size();i++){
-      final String url=urls.get(i);
-      final String name=names.get(i);
+  void finishExtension(
+    AtomicInteger pending,
+    int index,
+    String name,
+    boolean success,
+    String message
+  ){
+    int done=
+      extensionDone
+        .incrementAndGet();
 
-      controller.install(url).accept(
-        extension->{
-          android.util.Log.i(
-            "JepongExt",
-            "Extension installed/enabled: "+
-            extension.id
-          );
+    if(success){
+      extensionReady
+        .incrementAndGet();
 
-          updateExtensionProgress(
-            name,
-            true
-          );
+      setExtensionRow(
+        index,
+        "✓ "+name+
+        " • "+message,
+        Color.rgb(
+          74,
+          222,
+          128
+        )
+      );
 
-          done.run();
-        },
+    }else{
 
-        error->{
-          android.util.Log.w(
-            "JepongExt",
-            "Install returned error; checking persisted extension",
-            error
-          );
+      extensionFailed
+        .incrementAndGet();
 
-          updateExtensionProgress(
-            name,
-            false
-          );
-
-          done.run();
-        }
+      setExtensionRow(
+        index,
+        "✕ "+name+
+        " • "+message,
+        Color.rgb(
+          248,
+          113,
+          113
+        )
       );
     }
+
+    int total=
+      extensionRows.size();
+
+    int percent=
+      total==0
+        ? 80
+        : Math.min(
+            80,
+            Math.round(
+              done *
+              80f /
+              total
+            )
+          );
+
+    runOnUiThread(()->{
+
+      loadingBar.setProgress(
+        percent
+      );
+
+      loadingCount.setText(
+        done+
+        " / "+
+        total+
+        " extensions checked"
+      );
+    });
+
+    if(
+      pending.decrementAndGet()==0
+    ){
+      onExtensionsFinished();
+    }
+  }
+
+  void setExtensionRow(
+    int index,
+    String text,
+    int color
+  ){
+    runOnUiThread(()->{
+
+      if(
+        index>=0 &&
+        index<extensionRows.size()
+      ){
+        TextView row=
+          extensionRows.get(index);
+
+        row.setText(text);
+        row.setTextColor(color);
+      }
+    });
+  }
+
+  void onExtensionsFinished(){
+    runOnUiThread(()->{
+
+      loadingBar.setProgress(80);
+
+      int ready=
+        extensionReady.get();
+
+      int failed=
+        extensionFailed.get();
+
+      if(failed==0){
+
+        loadingStatus.setText(
+          "✓ Browser protection ready"
+        );
+
+        loadingCount.setText(
+          ready+
+          " extensions enabled"
+        );
+
+        new Handler(
+          Looper.getMainLooper()
+        ).postDelayed(
+          this::loadWebsite,
+          250
+        );
+
+      }else{
+
+        loadingStatus.setText(
+          "Some extensions need attention"
+        );
+
+        loadingCount.setText(
+          ready+
+          " ready • "+
+          failed+
+          " failed"
+        );
+
+        WebExtensionController controller=
+          runtime
+            .getWebExtensionController();
+
+        showExtensionActions(
+          controller
+        );
+      }
+    });
+  }
+
+  void showExtensionActions(
+    WebExtensionController controller
+  ){
+    runOnUiThread(()->{
+
+      retryButton.setText(
+        "Retry extensions"
+      );
+
+      retryButton.setVisibility(
+        View.VISIBLE
+      );
+
+      continueButton.setText(
+        "Continue without failed extensions"
+      );
+
+      continueButton.setVisibility(
+        View.VISIBLE
+      );
+
+      retryButton.setOnClickListener(
+        view->{
+          prepareExtensions(
+            controller
+          );
+        }
+      );
+
+      continueButton.setOnClickListener(
+        view->{
+          hideActionButtons();
+          loadWebsite();
+        }
+      );
+    });
+  }
+
+  void hideActionButtons(){
+    runOnUiThread(()->{
+      retryButton.setVisibility(
+        View.GONE
+      );
+
+      continueButton.setVisibility(
+        View.GONE
+      );
+    });
+  }
+
+  void loadWebsite(){
+    runOnUiThread(()->{
+
+      hideActionButtons();
+
+      loadingBar.setProgress(80);
+
+      loadingStatus.setText(
+        "Loading website..."
+      );
+
+      loadingCount.setText(
+        "Starting GeckoView"
+      );
+
+      session.loadUri(HOME);
+    });
+  }
+
+  void setWebsiteProgress(
+    int progress
+  ){
+    int safe=
+      Math.max(
+        0,
+        Math.min(
+          100,
+          progress
+        )
+      );
+
+    int overall=
+      80 +
+      (
+        safe *
+        20 /
+        100
+      );
+
+    runOnUiThread(()->{
+
+      loadingBar.setProgress(
+        overall
+      );
+
+      loadingStatus.setText(
+        "Loading website..."
+      );
+
+      loadingCount.setText(
+        safe+"%"
+      );
+    });
+  }
+
+  void beginWebsiteTimeout(){
+    cancelWebsiteTimeout();
+
+    websiteTimeout=()->{
+      showWebsiteError(
+        "Website loading timed out."
+      );
+    };
+
+    timeoutHandler.postDelayed(
+      websiteTimeout,
+      30000
+    );
+  }
+
+  void cancelWebsiteTimeout(){
+    if(websiteTimeout!=null){
+      timeoutHandler
+        .removeCallbacks(
+          websiteTimeout
+        );
+
+      websiteTimeout=null;
+    }
+  }
+
+  void showWebsiteError(
+    String message
+  ){
+    runOnUiThread(()->{
+
+      cancelWebsiteTimeout();
+
+      if(
+        loader.getParent()==null
+      ){
+        root.addView(
+          loader,
+          new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+          )
+        );
+      }
+
+      loader.setAlpha(1f);
+
+      loadingStatus.setText(
+        "Unable to open website"
+      );
+
+      loadingCount.setText(
+        message
+      );
+
+      loadingBar.setProgress(80);
+
+      retryButton.setText(
+        "Retry website"
+      );
+
+      retryButton.setVisibility(
+        View.VISIBLE
+      );
+
+      retryButton.setOnClickListener(
+        view->{
+          retryButton.setVisibility(
+            View.GONE
+          );
+
+          loadWebsite();
+        }
+      );
+
+      continueButton.setVisibility(
+        View.GONE
+      );
+    });
+  }
+
+  void finishLoader(){
+    runOnUiThread(()->{
+
+      loadingBar.setProgress(100);
+
+      loadingStatus.setText(
+        "✓ Ready"
+      );
+
+      loadingCount.setText(
+        "100%"
+      );
+
+      hideActionButtons();
+
+      new Handler(
+        Looper.getMainLooper()
+      ).postDelayed(
+        ()->{
+          if(
+            loader!=null &&
+            loader.getParent()==root
+          ){
+            loader.animate()
+              .alpha(0f)
+              .setDuration(250)
+              .withEndAction(
+                ()->root.removeView(
+                  loader
+                )
+              )
+              .start();
+          }
+        },
+        180
+      );
+    });
   }
 
   @Override
   public void onBackPressed(){
-    if(session!=null)
+    if(session!=null){
       session.goBack();
-    else
+    }else{
       super.onBackPressed();
+    }
   }
 }
-`;
+\`;
 }
 
