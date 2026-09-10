@@ -1963,3 +1963,74 @@ dialog{
     align-items:flex-start;
   }
 }
+
+/* ==========================================
+   ENGINE CAPABILITY TRUTH STATES
+   ========================================== */
+
+.capability-status{
+  display:inline-flex !important;
+  align-items:center;
+  width:max-content;
+  min-height:20px;
+  padding:3px 7px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  font-size:9px !important;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.02em
+}
+
+.option-toggle[
+  data-capability-status="verified"
+]{
+  opacity:1
+}
+
+.option-toggle[
+  data-capability-status="experimental"
+],
+.option-toggle[
+  data-capability-status="unsupported"
+]{
+  opacity:.68
+}
+
+.option-toggle[
+  data-capability-status="experimental"
+] .capability-status::before{
+  content:"◌";
+  margin-right:4px
+}
+
+.option-toggle[
+  data-capability-status="unsupported"
+] .capability-status::before{
+  content:"×";
+  margin-right:4px
+}
+
+.option-toggle[
+  data-capability-status="verified"
+] .capability-status::before{
+  content:"✓";
+  margin-right:4px
+}
+
+.option-toggle input:disabled{
+  cursor:not-allowed
+}
+
+.option-toggle.disabled{
+  opacity:.68
+}
+
+.option-toggle .option-copy{
+  min-width:0;
+  flex:1
+}
+
+.option-toggle .support{
+  line-height:1.35
+}

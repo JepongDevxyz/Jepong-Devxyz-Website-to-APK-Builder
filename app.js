@@ -1,40 +1,12 @@
+import {
+  CAPABILITY_STATUS,
+  FEATURES,
+  ENGINE_CAPABILITIES,
+  getCapability
+} from './capabilities.mjs';
+
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
-
-const PERMISSIONS=[
-  ['camera','Camera','Android runtime + per-site prompt on GeckoView'],
-  ['microphone','Microphone','Android runtime + per-site prompt on GeckoView'],
-  ['notification','Notifications','Web Notifications + Android runtime/per-site permission; Web Push backend separate'],
-  ['location','Location','Runtime permission + per-site prompt on GeckoView'],
-  ['media','Photos & videos','Media library access'],
-  ['contacts','Contacts','Android permission; advanced Gecko bridge foundation only'],
-  ['calendar','Calendar','Android permission; advanced Gecko bridge foundation only'],
-  ['biometrics','Biometrics','Android capability; advanced Gecko bridge foundation only'],
-  ['files','Files & documents','Uses system file flow where supported'],
-  ['bluetooth','Bluetooth','Android permission; advanced Gecko bridge foundation only'],
-  ['sensors','Sensors','Android permission; advanced Gecko bridge foundation only']
-];
-
-const CONTROLS=[
-  ['pullRefresh','Pull-down refresh','Native only'],
-  ['hideScrollbars','Hide scrollbars','Native only'],
-  ['transparentNav','Transparent system bars','Supported engines'],
-  ['pinchZoom','Pinch to zoom','Engine-specific'],
-  ['disableCopy','Disable text copy','Native only'],
-  ['blockAdsRedirects','Block ad redirects','Basic Native filter'],
-  ['navigationToolbar','Navigation toolbar','Back, forward, home, refresh and share'],
-  ['externalLinks','External link rules','Open user-clicked off-site links in Android'],
-  ['downloadManager','Download manager','Android system downloads for standard HTTP/HTTPS files'],
-  ['adguardDns','AdGuard DNS','Requires VPN/DNS layer']
-];
-
-const EXTENSIONS=[
-  ['adguard','AdGuard AdBlocker','GeckoView'],
-  ['ghostery','Ghostery','GeckoView'],
-  ['privacyBadger','Privacy Badger','GeckoView'],
-  ['darkReader','Dark Reader','GeckoView'],
-  ['ublock','uBlock Origin','GeckoView']
-];
 
 const OPTION_ICONS={
   camera:'camera',
@@ -96,68 +68,46 @@ const META={
   }
 };
 
-const COMPAT={
+const RENDER_SUPPORT={
   native:{
-    render:{default:1,hardware:1,software:1},
-    permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),
-    controls:{
-      pullRefresh:1,
-      hideScrollbars:1,
-      transparentNav:1,
-      pinchZoom:1,
-      disableCopy:1,
-      blockAdsRedirects:1,
-      adguardDns:0
-    },
-    extensions:{}
+    default:true,
+    hardware:true,
+    software:true
   },
 
   gecko:{
-    render:{default:1,hardware:1,software:0},
-    permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),
-    controls:{
-      pullRefresh:0,
-      hideScrollbars:0,
-      transparentNav:1,
-      pinchZoom:0,
-      disableCopy:0,
-      blockAdsRedirects:0,
-      navigationToolbar:1,
-      externalLinks:1,
-      downloadManager:1,
-      adguardDns:0
-    },
-    extensions:Object.fromEntries(EXTENSIONS.map(([k])=>[k,1]))
+    default:true,
+    hardware:true,
+    software:false
   },
 
   capacitor:{
-    render:{default:1,hardware:1,software:1},
-    permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),
-    controls:{
-      pullRefresh:0,
-      hideScrollbars:0,
-      transparentNav:1,
-      pinchZoom:1,
-      disableCopy:0,
-      blockAdsRedirects:0,
-      adguardDns:0
-    },
-    extensions:{}
+    default:true,
+    hardware:true,
+    software:true
   },
 
   cordova:{
-    render:{default:1,hardware:1,software:1},
-    permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),
-    controls:{
-      pullRefresh:0,
-      hideScrollbars:0,
-      transparentNav:1,
-      pinchZoom:1,
-      disableCopy:0,
-      blockAdsRedirects:0,
-      adguardDns:0
-    },
-    extensions:{}
+    default:true,
+    hardware:true,
+    software:true
+  }
+};
+
+const statusMeta={
+  [CAPABILITY_STATUS.VERIFIED]:{
+    label:'Verified',
+    selectable:true
+  },
+
+  [CAPABILITY_STATUS.EXPERIMENTAL]:{
+    label:'Experimental',
+    selectable:false
+  },
+
+  [CAPABILITY_STATUS.UNSUPPORTED]:{
+    label:'Unsupported',
+    selectable:false
   }
 };
 
@@ -174,38 +124,73 @@ const presetKey='jepong-apk-presets-v2';
 const historyKey='jepong-apk-history-v2';
 const themeKey='jepong-apk-theme';
 
-function renderOptions(list,host,group){
-  host.innerHTML=list.map(([id,label,desc])=>`
-    <label
-      class="toggle option-toggle"
-      data-option="${id}"
-      data-desc="${desc}">
+function renderOptions(
+  list,
+  host,
+  group
+){
+  host.innerHTML=
+    list.map(({id,label})=>`
+      <label
+        class="toggle option-toggle disabled"
+        data-option="${id}"
+        data-capability-status="unsupported">
 
-      <input
-        class="ios-input"
-        type="checkbox"
-        value="${id}"
-        data-group="${group}">
+        <input
+          class="ios-input"
+          type="checkbox"
+          value="${id}"
+          data-group="${group}"
+          disabled>
 
-      <span class="option-icon" aria-hidden="true">
-        <i data-lucide="${OPTION_ICONS[id] || 'circle'}"></i>
-      </span>
+        <span
+          class="option-icon"
+          aria-hidden="true">
+          <i
+            data-lucide="${OPTION_ICONS[id] || 'circle'}">
+          </i>
+        </span>
 
-      <span class="option-copy">
-        <b>${label}</b>
-        <small class="support">${desc}</small>
-      </span>
+        <span class="option-copy">
+          <b>${label}</b>
 
-      <span class="ios-toggle" aria-hidden="true"></span>
-    </label>
-  `).join('');
+          <small class="capability-status">
+            Unsupported
+          </small>
+
+          <small class="support">
+            Checking engine capability…
+          </small>
+        </span>
+
+        <span
+          class="ios-toggle"
+          aria-hidden="true">
+        </span>
+      </label>
+    `).join('');
 
   refreshIcons();
 }
 
-renderOptions(PERMISSIONS,$('#permissionsList'),'permissions');
-renderOptions(CONTROLS,$('#controlsList'),'controls');
-renderOptions(EXTENSIONS,$('#extensionsList'),'extensions');
+renderOptions(
+  FEATURES.permissions,
+  $('#permissionsList'),
+  'permissions'
+);
+
+renderOptions(
+  FEATURES.controls,
+  $('#controlsList'),
+  'controls'
+);
+
+renderOptions(
+  FEATURES.extensions,
+  $('#extensionsList'),
+  'extensions'
+);
+
 refreshIcons();
 
 function setEngine(engine){
@@ -230,37 +215,97 @@ $$('input[name="engine"]').forEach(input=>{
 });
 
 function updateCompat(){
-  const eng=$('#engine').value;
-  const c=COMPAT[eng];
+  const eng=
+    $('#engine').value;
 
-  $$('#renderMode option').forEach(option=>{
-    option.disabled=!c.render[option.value];
-  });
-
-  if($('#renderMode').selectedOptions[0]?.disabled){
-    $('#renderMode').value='default';
+  if(!ENGINE_CAPABILITIES[eng]){
+    throw new Error(
+      `Unknown engine capability registry: ${eng}`
+    );
   }
 
-  for(const group of ['permissions','controls','extensions']){
-    $$(`input[data-group="${group}"]`).forEach(input=>{
-      const ok=!!c[group]?.[input.value];
-      const box=input.closest('.toggle');
-      const small=box.querySelector('.support');
+  const render=
+    RENDER_SUPPORT[eng];
 
-      input.disabled=!ok;
-      box.classList.toggle('disabled',!ok);
+  $$('#renderMode option')
+    .forEach(option=>{
+      option.disabled=
+        !render?.[option.value];
+    });
 
-      small.textContent=ok
-        ? box.dataset.desc
-        : 'Not supported by this engine';
+  if(
+    $('#renderMode')
+      .selectedOptions[0]
+      ?.disabled
+  ){
+    $('#renderMode').value=
+      'default';
+  }
 
-      if(!ok){
+  for(const group of [
+    'permissions',
+    'controls',
+    'extensions'
+  ]){
+    $$(
+      `input[data-group="${group}"]`
+    ).forEach(input=>{
+
+      const capability=
+        getCapability(
+          eng,
+          group,
+          input.value
+        );
+
+      const meta=
+        statusMeta[
+          capability.status
+        ] ??
+        statusMeta[
+          CAPABILITY_STATUS.UNSUPPORTED
+        ];
+
+      const box=
+        input.closest(
+          '.option-toggle'
+        );
+
+      const reason=
+        box.querySelector(
+          '.support'
+        );
+
+      const badge=
+        box.querySelector(
+          '.capability-status'
+        );
+
+      input.disabled=
+        !meta.selectable;
+
+      box.classList.toggle(
+        'disabled',
+        input.disabled
+      );
+
+      box.dataset.capabilityStatus=
+        capability.status;
+
+      badge.textContent=
+        meta.label;
+
+      reason.textContent=
+        capability.reason;
+
+      if(input.disabled){
         input.checked=false;
       }
     });
   }
 
-  $('#compatNote').textContent=META[eng].note;
+  $('#compatNote').textContent=
+    `${META[eng].note} Only runtime-verified capabilities can be selected normally. Experimental and Unsupported options remain visible for transparency.`;
 
   updateSizeOptimizationUI();
   updateCount();

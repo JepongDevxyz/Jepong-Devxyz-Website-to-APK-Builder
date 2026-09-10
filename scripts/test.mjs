@@ -145,6 +145,50 @@ for(const requiredSignerToken of [
   }
 }
 
+
+/* Builder canonical capability UI assertions */
+{
+  const builderSource=
+    fs.readFileSync(
+      path.join(root,'app.js'),
+      'utf8'
+    );
+
+  if(
+    !builderSource.includes(
+      "from './capabilities.mjs'"
+    )
+  ){
+    throw new Error(
+      'builder UI does not consume canonical capability registry'
+    );
+  }
+
+  if(
+    builderSource.includes(
+      'permissions:Object.fromEntries(PERMISSIONS.map'
+    )
+  ){
+    throw new Error(
+      'legacy all-permissions-supported table still exists'
+    );
+  }
+
+  for(const token of [
+    'Verified',
+    'Experimental',
+    'Unsupported',
+    'data-capability-status',
+    'getCapability('
+  ]){
+    if(!builderSource.includes(token)){
+      throw new Error(
+        `builder capability UI missing: ${token}`
+      );
+    }
+  }
+}
+
 const allPermissions=['camera','microphone','notification','location','media','contacts','calendar','biometrics','files','bluetooth','sensors'];
 const nativeControls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects'];
 const geckoExtensions=['adguard','ghostery','privacyBadger','darkReader','ublock'];
