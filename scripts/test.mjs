@@ -348,6 +348,58 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   }
 }
 
+
+/* Native WebView permission behavior assertions */
+{
+  const nativeMain=
+    fs.readFileSync(
+      path.join(
+        root,
+        'work',
+        'test-native',
+        'project',
+        'app',
+        'src',
+        'main',
+        'java',
+        'com',
+        'jepongdevxyz',
+        'app',
+        'MainActivity.java'
+      ),
+      'utf8'
+    );
+
+  if(
+    nativeMain.includes(
+      'req.grant(req.getResources())'
+    )
+  ){
+    throw new Error(
+      'native: blanket WebView permission grant still exists'
+    );
+  }
+
+  for(const token of [
+    'CAMERA_ENABLED',
+    'MICROPHONE_ENABLED',
+    'LOCATION_ENABLED',
+    'FILES_ENABLED',
+    'RESOURCE_VIDEO_CAPTURE',
+    'RESOURCE_AUDIO_CAPTURE',
+    'filterWebPermissionResources',
+    'hasAndroidPermission',
+    'hasEitherLocationPermission',
+    'if(!FILES_ENABLED)'
+  ]){
+    if(!nativeMain.includes(token)){
+      throw new Error(
+        `native permission behavior missing: ${token}`
+      );
+    }
+  }
+}
+
 /* Gecko Browser Controls UI assertions */
 {
   const appText=
