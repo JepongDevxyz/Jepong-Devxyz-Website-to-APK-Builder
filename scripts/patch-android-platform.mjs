@@ -56,7 +56,7 @@ function injectDependency(dep){
  const gradle=candidates.find(fs.existsSync); if(!gradle) throw new Error('Could not find app Gradle file');
  let s=fs.readFileSync(gradle,'utf8'); if(s.includes(dep)) return;
  const line=gradle.endsWith('.kts')?`    implementation("${dep}")`:`    implementation '${dep}'`;
- const idx=s.indexOf('dependencies {'); if(idx<0) throw new Error('No dependencies block in app Gradle');
+ const idx=engine==='cordova'?s.lastIndexOf('dependencies {'):s.indexOf('dependencies {'); if(idx<0) throw new Error('No dependencies block in app Gradle');
  const pos=idx+'dependencies {'.length; s=s.slice(0,pos)+`\n${line}`+s.slice(pos); fs.writeFileSync(gradle,s);
 }
 function writeOneSignalApplication(){
