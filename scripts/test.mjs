@@ -166,8 +166,50 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     'onExternalResponse',
     'DownloadManager',
     'VISIBILITY_VISIBLE_NOTIFY_COMPLETED',
-    'enqueueDownload'
+    'enqueueDownload',
+    'jepong_site_permissions',
+    'RUNTIME_PERMISSION_REQUEST',
+    'isAndroidPermissionSelected',
+    'PERMISSION_GEOLOCATION',
+    'PERMISSION_DESKTOP_NOTIFICATION',
+    'PERMISSION_TRACKING',
+    'ContentPermission.VALUE_DENY',
+    'ContentPermission.VALUE_PROMPT',
+    'Allow once',
+    'Always allow',
+    'Always block',
+    'findMediaSource',
+    'MediaSource.SOURCE_CAMERA',
+    'MediaSource.SOURCE_MICROPHONE',
+    'pendingAndroidPermissionCallback',
+    'deviceBridgeCapabilitySummary',
+    'Advanced bridge foundation only',
+    'showSitePermissionsManager'
   ];
+
+
+  if(
+    geckoMain.includes(
+      "requestPermissions(missing.toArray(new String[0]),700)"
+    )
+  ){
+    throw new Error(
+      "gecko: selected permissions must not all be requested at startup"
+    );
+  }
+
+  if(
+    !geckoMain.includes(
+      "requestPermissions("
+    ) ||
+    !geckoMain.includes(
+      "RUNTIME_PERMISSION_REQUEST"
+    )
+  ){
+    throw new Error(
+      "gecko: on-demand Android runtime permission flow missing"
+    );
+  }
 
   for(
     const token

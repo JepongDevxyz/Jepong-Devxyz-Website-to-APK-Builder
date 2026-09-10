@@ -110,10 +110,91 @@ function javaPermissionBuilder(cfg){
   return lines.join('\n    ');
 }
 
-function splashMethods(cfg){
+function splashMethods(cfg,deferRuntimePermissions=false){
   const enabled=cfg.splashEnabled!==false;
-  const duration=Math.max(0,Math.min(15000,Number(cfg.splashDuration)||1500));
-  return `void begin(){\n    ${enabled ? `ImageView splash=new ImageView(this); splash.setImageResource(R.drawable.app_splash); splash.setScaleType(ImageView.ScaleType.CENTER_CROP); splash.setBackgroundColor(Color.rgb(17,24,39)); setContentView(splash); new Handler(Looper.getMainLooper()).postDelayed(this::checkPermissionsThenStart, ${duration});` : 'checkPermissionsThenStart();'}\n  }\n  void checkPermissionsThenStart(){ ArrayList<String> missing=new ArrayList<>(); for(String x:wantedPermissions()) if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(x)!=PackageManager.PERMISSION_GRANTED) missing.add(x); if(!missing.isEmpty()){ requestPermissions(missing.toArray(new String[0]),700); } else startBrowser(); }\n  @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){ super.onRequestPermissionsResult(code,permissions,results); if(code==700) startBrowser(); }\n  String[] wantedPermissions(){ ArrayList<String> p=new ArrayList<>(); ${javaPermissionBuilder(cfg)} return p.toArray(new String[0]); }`;
+
+  const duration=
+    Math.max(
+      0,
+      Math.min(
+        15000,
+        Number(cfg.splashDuration)||1500
+      )
+    );
+
+  const permissionFlow=
+    deferRuntimePermissions
+      ? 'startBrowser();'
+      : `ArrayList<String> missing=new ArrayList<>();
+    for(String x:wantedPermissions()){
+      if(
+        Build.VERSION.SDK_INT>=23 &&
+        checkSelfPermission(x)!=PackageManager.PERMISSION_GRANTED
+      ){
+        missing.add(x);
+      }
+    }
+    if(!missing.isEmpty()){
+      requestPermissions(
+        missing.toArray(new String[0]),
+        700
+      );
+    }else{
+      startBrowser();
+    }`;
+
+  const permissionResult=
+    deferRuntimePermissions
+      ? ''
+      : `@Override
+  public void onRequestPermissionsResult(
+    int code,
+    String[] permissions,
+    int[] results
+  ){
+    super.onRequestPermissionsResult(
+      code,
+      permissions,
+      results
+    );
+
+    if(code==700){
+      startBrowser();
+    }
+  }`;
+
+  return `void begin(){
+    ${enabled
+      ? `ImageView splash=new ImageView(this);
+    splash.setImageResource(R.drawable.app_splash);
+    splash.setScaleType(ImageView.ScaleType.CENTER_CROP);
+    splash.setBackgroundColor(Color.rgb(17,24,39));
+    setContentView(splash);
+
+    new Handler(
+      Looper.getMainLooper()
+    ).postDelayed(
+      this::checkPermissionsThenStart,
+      ${duration}
+    );`
+      : 'checkPermissionsThenStart();'}
+  }
+
+  void checkPermissionsThenStart(){
+    ${permissionFlow}
+  }
+
+  ${permissionResult}
+
+  String[] wantedPermissions(){
+    ArrayList<String> p=new ArrayList<>();
+
+    ${javaPermissionBuilder(cfg)}
+
+    return p.toArray(
+      new String[0]
+    );
+  }`;
 }
 
 function webViewActivity(cfg) {
@@ -194,6 +275,116 @@ function geckoActivity(cfg) {
     (cfg.permissions||[])
       .includes('files');
 
+  const selectedPermissions=
+    cfg.permissions||[];
+
+  const cameraEnabled=
+    selectedPermissions.includes('camera');
+
+  const microphoneEnabled=
+    selectedPermissions.includes('microphone');
+
+  const notificationEnabled=
+    selectedPermissions.includes('notification');
+
+  const locationEnabled=
+    selectedPermissions.includes('location');
+
+  const contactsEnabled=
+    selectedPermissions.includes('contacts');
+
+  const calendarEnabled=
+    selectedPermissions.includes('calendar');
+
+  const biometricsEnabled=
+    selectedPermissions.includes('biometrics');
+
+  const bluetoothEnabled=
+    selectedPermissions.includes('bluetooth');
+
+  const sensorsEnabled=
+    selectedPermissions.includes('sensors');
+
+  const mediaEnabled=
+    selectedPermissions.includes('media');
+
+  const allowedAndroidPermissions=[];
+
+  if(cameraEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.CAMERA'
+    );
+  }
+
+  if(microphoneEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.RECORD_AUDIO'
+    );
+  }
+
+  if(notificationEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.POST_NOTIFICATIONS'
+    );
+  }
+
+  if(locationEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION'
+    );
+  }
+
+  if(contactsEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.READ_CONTACTS'
+    );
+  }
+
+  if(calendarEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.READ_CALENDAR',
+      'android.permission.WRITE_CALENDAR'
+    );
+  }
+
+  if(biometricsEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.USE_BIOMETRIC'
+    );
+  }
+
+  if(bluetoothEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.BLUETOOTH_SCAN',
+      'android.permission.BLUETOOTH_CONNECT',
+      'android.permission.BLUETOOTH',
+      'android.permission.BLUETOOTH_ADMIN'
+    );
+  }
+
+  if(sensorsEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.BODY_SENSORS'
+    );
+  }
+
+  if(mediaEnabled){
+    allowedAndroidPermissions.push(
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_EXTERNAL_STORAGE'
+    );
+  }
+
+  const androidPermissionPolicy=
+    [...new Set(allowedAndroidPermissions)]
+      .map(
+        permission=>
+          `if(permission.equals(${javaString(permission)})) return true;`
+      )
+      .join('\n    ');
+
   const hard=
     cfg.renderMode==='hardware';
 
@@ -208,6 +399,7 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.app.DownloadManager;
+import android.app.AlertDialog;
 import android.webkit.URLUtil;
 import android.widget.*;
 import java.util.*;
@@ -223,7 +415,20 @@ public class MainActivity extends Activity {
   final boolean DOWNLOAD_MANAGER=${downloadManager};
   final boolean FILES_ENABLED=${filesEnabled};
 
+  final boolean CAMERA_ENABLED=${cameraEnabled};
+  final boolean MICROPHONE_ENABLED=${microphoneEnabled};
+  final boolean NOTIFICATION_ENABLED=${notificationEnabled};
+  final boolean LOCATION_ENABLED=${locationEnabled};
+
+  final boolean CONTACTS_ENABLED=${contactsEnabled};
+  final boolean CALENDAR_ENABLED=${calendarEnabled};
+  final boolean BIOMETRICS_ENABLED=${biometricsEnabled};
+  final boolean BLUETOOTH_ENABLED=${bluetoothEnabled};
+  final boolean SENSORS_ENABLED=${sensorsEnabled};
+  final boolean MEDIA_ENABLED=${mediaEnabled};
+
   static final int FILE_PICKER_REQUEST=902;
+  static final int RUNTIME_PERMISSION_REQUEST=703;
 
   GeckoRuntime runtime;
   GeckoSession session;
@@ -264,6 +469,10 @@ public class MainActivity extends Activity {
     new ArrayList<>();
 
   SharedPreferences extensionPrefs;
+  SharedPreferences permissionPrefs;
+
+  GeckoSession.PermissionDelegate.Callback
+    pendingAndroidPermissionCallback;
 
   boolean started=false;
 
@@ -301,7 +510,7 @@ public class MainActivity extends Activity {
     begin();
   }
 
-  ${splashMethods(cfg)}
+  ${splashMethods(cfg,true)}
 
   int dp(int value){
     return (int)(
@@ -342,7 +551,18 @@ public class MainActivity extends Activity {
         MODE_PRIVATE
       );
 
+    permissionPrefs=
+      getSharedPreferences(
+        "jepong_site_permissions",
+        MODE_PRIVATE
+      );
+
     buildBrowserScreen();
+
+    android.util.Log.i(
+      "JepongBridge",
+      deviceBridgeCapabilitySummary()
+    );
 
     runtime=
       GeckoRuntime.create(this);
@@ -627,26 +847,71 @@ public class MainActivity extends Activity {
           String[] permissions,
           Callback callback
         ){
-          boolean granted=true;
+          if(Build.VERSION.SDK_INT<23){
+            callback.grant();
+            return;
+          }
+
+          if(
+            pendingAndroidPermissionCallback!=null
+          ){
+            callback.reject();
+            return;
+          }
+
+          ArrayList<String> missing=
+            new ArrayList<>();
 
           if(permissions!=null){
             for(String permission:permissions){
+
               if(
-                Build.VERSION.SDK_INT>=23 &&
-                checkSelfPermission(permission)
-                  !=PackageManager
-                    .PERMISSION_GRANTED
+                !isAndroidPermissionSelected(
+                  permission
+                )
               ){
-                granted=false;
+                callback.reject();
+                return;
+              }
+
+              if(
+                checkSelfPermission(permission)
+                  !=PackageManager.PERMISSION_GRANTED
+              ){
+                missing.add(permission);
               }
             }
           }
 
-          if(granted){
+          if(missing.isEmpty()){
             callback.grant();
-          }else{
-            callback.reject();
+            return;
           }
+
+          pendingAndroidPermissionCallback=
+            callback;
+
+          runOnUiThread(()->{
+            try{
+              requestPermissions(
+                missing.toArray(
+                  new String[0]
+                ),
+                RUNTIME_PERMISSION_REQUEST
+              );
+            }catch(Exception error){
+
+              Callback pending=
+                pendingAndroidPermissionCallback;
+
+              pendingAndroidPermissionCallback=
+                null;
+
+              if(pending!=null){
+                pending.reject();
+              }
+            }
+          });
         }
 
         @Override
@@ -655,8 +920,71 @@ public class MainActivity extends Activity {
           GeckoSession currentSession,
           ContentPermission permission
         ){
+          if(permission==null){
+            return GeckoResult.fromValue(
+              ContentPermission.VALUE_DENY
+            );
+          }
+
+          if(
+            permission.permission==
+              PERMISSION_TRACKING
+          ){
+            return GeckoResult.fromValue(
+              ContentPermission.VALUE_DENY
+            );
+          }
+
+          if(
+            permission.permission==
+              PERMISSION_GEOLOCATION
+          ){
+            if(
+              !LOCATION_ENABLED ||
+              !hasEitherLocationPermission()
+            ){
+              return GeckoResult.fromValue(
+                ContentPermission.VALUE_DENY
+              );
+            }
+
+            return askContentPermission(
+              permission,
+              "location",
+              "Location"
+            );
+          }
+
+          if(
+            permission.permission==
+              PERMISSION_DESKTOP_NOTIFICATION
+          ){
+            if(!NOTIFICATION_ENABLED){
+              return GeckoResult.fromValue(
+                ContentPermission.VALUE_DENY
+              );
+            }
+
+            if(
+              Build.VERSION.SDK_INT>=33 &&
+              !hasAndroidPermission(
+                Manifest.permission.POST_NOTIFICATIONS
+              )
+            ){
+              return GeckoResult.fromValue(
+                ContentPermission.VALUE_DENY
+              );
+            }
+
+            return askContentPermission(
+              permission,
+              "notifications",
+              "Notifications"
+            );
+          }
+
           return GeckoResult.fromValue(
-            ContentPermission.VALUE_ALLOW
+            ContentPermission.VALUE_PROMPT
           );
         }
 
@@ -668,21 +996,103 @@ public class MainActivity extends Activity {
           MediaSource[] audio,
           MediaCallback callback
         ){
-          MediaSource selectedVideo=
+          MediaSource camera=
+            findMediaSource(
+              video,
+              MediaSource.SOURCE_CAMERA
+            );
+
+          MediaSource microphone=
+            findMediaSource(
+              audio,
+              MediaSource.SOURCE_MICROPHONE
+            );
+
+          boolean videoRequested=
             video!=null &&
-            video.length>0
-              ? video[0]
-              : null;
+            video.length>0;
 
-          MediaSource selectedAudio=
+          boolean audioRequested=
             audio!=null &&
-            audio.length>0
-              ? audio[0]
-              : null;
+            audio.length>0;
 
-          callback.grant(
-            selectedVideo,
-            selectedAudio
+          /*
+           * Screen capture and device-audio capture
+           * are not silently treated as camera/microphone.
+           */
+          if(
+            videoRequested &&
+            camera==null
+          ){
+            callback.reject();
+            return;
+          }
+
+          if(
+            audioRequested &&
+            microphone==null
+          ){
+            callback.reject();
+            return;
+          }
+
+          if(
+            camera!=null &&
+            (
+              !CAMERA_ENABLED ||
+              !hasAndroidPermission(
+                Manifest.permission.CAMERA
+              )
+            )
+          ){
+            callback.reject();
+            return;
+          }
+
+          if(
+            microphone!=null &&
+            (
+              !MICROPHONE_ENABLED ||
+              !hasAndroidPermission(
+                Manifest.permission.RECORD_AUDIO
+              )
+            )
+          ){
+            callback.reject();
+            return;
+          }
+
+          if(
+            camera==null &&
+            microphone==null
+          ){
+            callback.reject();
+            return;
+          }
+
+          String kind=
+            camera!=null &&
+            microphone!=null
+              ? "camera_microphone"
+              : camera!=null
+                ? "camera"
+                : "microphone";
+
+          String label=
+            camera!=null &&
+            microphone!=null
+              ? "Camera and microphone"
+              : camera!=null
+                ? "Camera"
+                : "Microphone";
+
+          askMediaPermission(
+            uri,
+            kind,
+            label,
+            camera,
+            microphone,
+            callback
           );
         }
       }
@@ -737,6 +1147,353 @@ public class MainActivity extends Activity {
     view.setSession(session);
 
     prepareExtensions(controller);
+  }
+
+
+  boolean isAndroidPermissionSelected(
+    String permission
+  ){
+    if(permission==null){
+      return false;
+    }
+
+    ${androidPermissionPolicy}
+
+    return false;
+  }
+
+  boolean hasAndroidPermission(
+    String permission
+  ){
+    return
+      Build.VERSION.SDK_INT<23 ||
+      checkSelfPermission(permission)==
+        PackageManager.PERMISSION_GRANTED;
+  }
+
+  boolean hasEitherLocationPermission(){
+    return
+      hasAndroidPermission(
+        Manifest.permission.ACCESS_FINE_LOCATION
+      ) ||
+      hasAndroidPermission(
+        Manifest.permission.ACCESS_COARSE_LOCATION
+      );
+  }
+
+  String siteHost(
+    String uri
+  ){
+    try{
+      String host=
+        Uri.parse(uri).getHost();
+
+      if(
+        host!=null &&
+        !host.trim().isEmpty()
+      ){
+        return host
+          .toLowerCase(Locale.ROOT);
+      }
+    }catch(Exception ignored){}
+
+    return "unknown-site";
+  }
+
+  String sitePermissionKey(
+    String uri,
+    String kind
+  ){
+    return
+      kind+
+      "|" +
+      siteHost(uri);
+  }
+
+  String siteDisplayName(
+    String uri
+  ){
+    String host=
+      siteHost(uri);
+
+    return host.equals("unknown-site")
+      ? "This website"
+      : host;
+  }
+
+  GeckoResult<Integer>
+  askContentPermission(
+    ContentPermission permission,
+    String kind,
+    String label
+  ){
+    final String key=
+      sitePermissionKey(
+        permission.uri,
+        kind
+      );
+
+    final String saved=
+      permissionPrefs.getString(
+        key,
+        "ask"
+      );
+
+    if(saved.equals("allow")){
+      return GeckoResult.fromValue(
+        ContentPermission.VALUE_ALLOW
+      );
+    }
+
+    if(saved.equals("deny")){
+      return GeckoResult.fromValue(
+        ContentPermission.VALUE_DENY
+      );
+    }
+
+    final GeckoResult<Integer> result=
+      new GeckoResult<>();
+
+    runOnUiThread(()->{
+      try{
+        new AlertDialog.Builder(this)
+          .setTitle(
+            label+" permission"
+          )
+          .setMessage(
+            siteDisplayName(
+              permission.uri
+            )+
+            " wants to use "+
+            label.toLowerCase(
+              Locale.ROOT
+            )+
+            "."
+          )
+          .setPositiveButton(
+            "Allow once",
+            (dialog,which)->{
+              result.complete(
+                ContentPermission
+                  .VALUE_ALLOW
+              );
+            }
+          )
+          .setNeutralButton(
+            "Always allow",
+            (dialog,which)->{
+              permissionPrefs
+                .edit()
+                .putString(
+                  key,
+                  "allow"
+                )
+                .apply();
+
+              result.complete(
+                ContentPermission
+                  .VALUE_ALLOW
+              );
+            }
+          )
+          .setNegativeButton(
+            "Always block",
+            (dialog,which)->{
+              permissionPrefs
+                .edit()
+                .putString(
+                  key,
+                  "deny"
+                )
+                .apply();
+
+              result.complete(
+                ContentPermission
+                  .VALUE_DENY
+              );
+            }
+          )
+          .setOnCancelListener(
+            dialog->{
+              result.complete(
+                ContentPermission
+                  .VALUE_DENY
+              );
+            }
+          )
+          .show();
+
+      }catch(Exception error){
+        result.complete(
+          ContentPermission.VALUE_DENY
+        );
+      }
+    });
+
+    return result;
+  }
+
+  MediaSource findMediaSource(
+    MediaSource[] sources,
+    int wantedSource
+  ){
+    if(sources==null){
+      return null;
+    }
+
+    for(MediaSource source:sources){
+      if(
+        source!=null &&
+        source.source==wantedSource
+      ){
+        return source;
+      }
+    }
+
+    return null;
+  }
+
+  void askMediaPermission(
+    String uri,
+    String kind,
+    String label,
+    MediaSource camera,
+    MediaSource microphone,
+    MediaCallback callback
+  ){
+    final String key=
+      sitePermissionKey(
+        uri,
+        kind
+      );
+
+    final String saved=
+      permissionPrefs.getString(
+        key,
+        "ask"
+      );
+
+    if(saved.equals("allow")){
+      callback.grant(
+        camera,
+        microphone
+      );
+      return;
+    }
+
+    if(saved.equals("deny")){
+      callback.reject();
+      return;
+    }
+
+    runOnUiThread(()->{
+      try{
+        new AlertDialog.Builder(this)
+          .setTitle(
+            label+" permission"
+          )
+          .setMessage(
+            siteDisplayName(uri)+
+            " wants to use "+
+            label.toLowerCase(
+              Locale.ROOT
+            )+
+            "."
+          )
+          .setPositiveButton(
+            "Allow once",
+            (dialog,which)->{
+              callback.grant(
+                camera,
+                microphone
+              );
+            }
+          )
+          .setNeutralButton(
+            "Always allow",
+            (dialog,which)->{
+              permissionPrefs
+                .edit()
+                .putString(
+                  key,
+                  "allow"
+                )
+                .apply();
+
+              callback.grant(
+                camera,
+                microphone
+              );
+            }
+          )
+          .setNegativeButton(
+            "Always block",
+            (dialog,which)->{
+              permissionPrefs
+                .edit()
+                .putString(
+                  key,
+                  "deny"
+                )
+                .apply();
+
+              callback.reject();
+            }
+          )
+          .setOnCancelListener(
+            dialog->callback.reject()
+          )
+          .show();
+
+      }catch(Exception error){
+        callback.reject();
+      }
+    });
+  }
+
+  String deviceBridgeCapabilitySummary(){
+    return
+      "Advanced bridge foundation only; "+
+      "not exposed to website JavaScript. "+
+      "files="+FILES_ENABLED+
+      ", contacts="+CONTACTS_ENABLED+
+      ", calendar="+CALENDAR_ENABLED+
+      ", biometrics="+BIOMETRICS_ENABLED+
+      ", bluetooth="+BLUETOOTH_ENABLED+
+      ", sensors="+SENSORS_ENABLED+
+      ", media="+MEDIA_ENABLED;
+  }
+
+  void showSitePermissionsManager(){
+    String message=
+      "Saved website permission decisions can be reset here.\\n\\n"+
+      deviceBridgeCapabilitySummary();
+
+    new AlertDialog.Builder(this)
+      .setTitle(
+        "Site permissions"
+      )
+      .setMessage(message)
+      .setPositiveButton(
+        "Reset saved decisions",
+        (dialog,which)->{
+          permissionPrefs
+            .edit()
+            .clear()
+            .apply();
+
+          Toast.makeText(
+            this,
+            "Saved site permissions reset",
+            Toast.LENGTH_SHORT
+          ).show();
+        }
+      )
+      .setNegativeButton(
+        "Close",
+        null
+      )
+      .show();
   }
 
   void buildBrowserScreen(){
@@ -1155,6 +1912,13 @@ public class MainActivity extends Activity {
         if(session!=null){
           session.loadUri(HOME);
         }
+      }
+    );
+
+    homeButton.setOnLongClickListener(
+      clicked->{
+        showSitePermissionsManager();
+        return true;
       }
     );
 
@@ -2349,6 +3113,61 @@ public class MainActivity extends Activity {
         180
       );
     });
+  }
+
+
+  @Override
+  public void onRequestPermissionsResult(
+    int requestCode,
+    String[] permissions,
+    int[] grantResults
+  ){
+    super.onRequestPermissionsResult(
+      requestCode,
+      permissions,
+      grantResults
+    );
+
+    if(
+      requestCode!=
+        RUNTIME_PERMISSION_REQUEST
+    ){
+      return;
+    }
+
+    GeckoSession.PermissionDelegate.Callback callback=
+      pendingAndroidPermissionCallback;
+
+    pendingAndroidPermissionCallback=
+      null;
+
+    if(callback==null){
+      return;
+    }
+
+    boolean granted=true;
+
+    if(
+      grantResults==null ||
+      grantResults.length==0
+    ){
+      granted=false;
+    }else{
+      for(int result:grantResults){
+        if(
+          result!=PackageManager.PERMISSION_GRANTED
+        ){
+          granted=false;
+          break;
+        }
+      }
+    }
+
+    if(granted){
+      callback.grant();
+    }else{
+      callback.reject();
+    }
   }
 
   @Override

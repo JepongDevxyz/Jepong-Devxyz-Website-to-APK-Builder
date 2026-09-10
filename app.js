@@ -2,17 +2,17 @@ const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
 const PERMISSIONS=[
-  ['camera','Camera','Android camera access'],
-  ['microphone','Microphone','Audio recording access'],
-  ['notification','Notifications','Android 13+ notifications'],
-  ['location','Location','Fine/coarse location'],
+  ['camera','Camera','Android runtime + per-site prompt on GeckoView'],
+  ['microphone','Microphone','Android runtime + per-site prompt on GeckoView'],
+  ['notification','Notifications','Android 13+ runtime + per-site prompt on GeckoView'],
+  ['location','Location','Runtime permission + per-site prompt on GeckoView'],
   ['media','Photos & videos','Media library access'],
-  ['contacts','Contacts','Android contacts permission'],
-  ['calendar','Calendar','Read/write calendar'],
-  ['biometrics','Biometrics','Biometric capability permission'],
+  ['contacts','Contacts','Android permission; advanced Gecko bridge foundation only'],
+  ['calendar','Calendar','Android permission; advanced Gecko bridge foundation only'],
+  ['biometrics','Biometrics','Android capability; advanced Gecko bridge foundation only'],
   ['files','Files & documents','Uses system file flow where supported'],
-  ['bluetooth','Bluetooth','Nearby/Bluetooth devices'],
-  ['sensors','Sensors','Body sensor permission']
+  ['bluetooth','Bluetooth','Android permission; advanced Gecko bridge foundation only'],
+  ['sensors','Sensors','Android permission; advanced Gecko bridge foundation only']
 ];
 
 const CONTROLS=[
