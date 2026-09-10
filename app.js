@@ -4,7 +4,7 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const PERMISSIONS=[
   ['camera','Camera','Android runtime + per-site prompt on GeckoView'],
   ['microphone','Microphone','Android runtime + per-site prompt on GeckoView'],
-  ['notification','Notifications','Android 13+ runtime + per-site prompt on GeckoView'],
+  ['notification','Notifications','Web Notifications + Android runtime/per-site permission; Web Push backend separate'],
   ['location','Location','Runtime permission + per-site prompt on GeckoView'],
   ['media','Photos & videos','Media library access'],
   ['contacts','Contacts','Android permission; advanced Gecko bridge foundation only'],

@@ -400,6 +400,9 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.app.DownloadManager;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.webkit.URLUtil;
 import android.widget.*;
 import java.util.*;
@@ -432,6 +435,13 @@ public class MainActivity extends Activity {
 
   static final int FILE_PICKER_REQUEST=902;
   static final int RUNTIME_PERMISSION_REQUEST=703;
+  static final int RUNTIME_NOTIFICATION_PERMISSION_REQUEST=704;
+
+  final String WEB_NOTIFICATION_CHANNEL=
+    "jepong_web_notifications";
+
+  final String WEB_NOTIFICATION_CHANNEL_NAME=
+    ${javaString(cfg.appName+' web notifications')};
 
   GeckoRuntime runtime;
   GeckoSession session;
@@ -476,6 +486,12 @@ public class MainActivity extends Activity {
 
   GeckoSession.PermissionDelegate.Callback
     pendingAndroidPermissionCallback;
+
+  GeckoResult<Integer>
+    pendingNotificationPermissionResult;
+
+  ContentPermission
+    pendingNotificationContentPermission;
 
   boolean started=false;
 
@@ -569,6 +585,33 @@ public class MainActivity extends Activity {
 
     runtime=
       GeckoRuntime.create(this);
+
+    if(NOTIFICATION_ENABLED){
+      ensureWebNotificationChannel();
+    }
+
+    runtime.setWebNotificationDelegate(
+      new WebNotificationDelegate(){
+
+        @Override
+        public void onShowNotification(
+          WebNotification notification
+        ){
+          showWebNotification(
+            notification
+          );
+        }
+
+        @Override
+        public void onCloseNotification(
+          WebNotification notification
+        ){
+          closeWebNotification(
+            notification
+          );
+        }
+      }
+    );
 
     WebExtensionController controller=
       runtime
@@ -962,27 +1005,8 @@ public class MainActivity extends Activity {
             permission.permission==
               PERMISSION_DESKTOP_NOTIFICATION
           ){
-            if(!NOTIFICATION_ENABLED){
-              return GeckoResult.fromValue(
-                ContentPermission.VALUE_DENY
-              );
-            }
-
-            if(
-              Build.VERSION.SDK_INT>=33 &&
-              !hasAndroidPermission(
-                Manifest.permission.POST_NOTIFICATIONS
-              )
-            ){
-              return GeckoResult.fromValue(
-                ContentPermission.VALUE_DENY
-              );
-            }
-
-            return askContentPermission(
-              permission,
-              "notifications",
-              "Notifications"
+            return requestNotificationContentPermission(
+              permission
             );
           }
 
@@ -1150,6 +1174,255 @@ public class MainActivity extends Activity {
     view.setSession(session);
 
     prepareExtensions(controller);
+  }
+
+
+  void ensureWebNotificationChannel(){
+    try{
+      NotificationManager manager=
+        (NotificationManager)
+          getSystemService(
+            NOTIFICATION_SERVICE
+          );
+
+      if(manager==null){
+        return;
+      }
+
+      NotificationChannel channel=
+        new NotificationChannel(
+          WEB_NOTIFICATION_CHANNEL,
+          WEB_NOTIFICATION_CHANNEL_NAME,
+          NotificationManager.IMPORTANCE_DEFAULT
+        );
+
+      channel.setDescription(
+        "Notifications from approved websites"
+      );
+
+      manager.createNotificationChannel(
+        channel
+      );
+
+    }catch(Exception ignored){}
+  }
+
+  int webNotificationId(
+    WebNotification notification
+  ){
+    String origin=
+      notification!=null &&
+      notification.origin!=null
+        ? notification.origin
+        : "";
+
+    String tag=
+      notification!=null &&
+      notification.tag!=null
+        ? notification.tag
+        : "";
+
+    int value=
+      (origin+"|"+tag).hashCode();
+
+    if(value==Integer.MIN_VALUE){
+      return 0;
+    }
+
+    return Math.abs(value);
+  }
+
+  void showWebNotification(
+    WebNotification notification
+  ){
+    if(notification==null){
+      return;
+    }
+
+    runOnUiThread(()->{
+      try{
+        if(
+          !NOTIFICATION_ENABLED ||
+          (
+            Build.VERSION.SDK_INT>=33 &&
+            !hasAndroidPermission(
+              Manifest.permission.POST_NOTIFICATIONS
+            )
+          )
+        ){
+          notification.dismiss();
+          return;
+        }
+
+        ensureWebNotificationChannel();
+
+        String title=
+          notification.title!=null &&
+          !notification.title.trim().isEmpty()
+            ? notification.title
+            : siteDisplayName(
+                notification.origin
+              );
+
+        String body=
+          notification.text!=null
+            ? notification.text
+            : "";
+
+        Notification.Builder builder=
+          new Notification.Builder(
+            this,
+            WEB_NOTIFICATION_CHANNEL
+          );
+
+        builder
+          .setSmallIcon(
+            android.R.drawable.ic_dialog_info
+          )
+          .setContentTitle(title)
+          .setContentText(body)
+          .setStyle(
+            new Notification.BigTextStyle()
+              .bigText(body)
+          )
+          .setAutoCancel(
+            !notification.requireInteraction
+          )
+          .setOngoing(
+            notification.requireInteraction
+          );
+
+        if(notification.silent){
+          builder.setSilent(true);
+        }
+
+        NotificationManager manager=
+          (NotificationManager)
+            getSystemService(
+              NOTIFICATION_SERVICE
+            );
+
+        if(manager==null){
+          notification.dismiss();
+          return;
+        }
+
+        manager.notify(
+          webNotificationId(notification),
+          builder.build()
+        );
+
+        notification.show();
+
+      }catch(Exception error){
+        try{
+          notification.dismiss();
+        }catch(Exception ignored){}
+      }
+    });
+  }
+
+  void closeWebNotification(
+    WebNotification notification
+  ){
+    if(notification==null){
+      return;
+    }
+
+    runOnUiThread(()->{
+      try{
+        NotificationManager manager=
+          (NotificationManager)
+            getSystemService(
+              NOTIFICATION_SERVICE
+            );
+
+        if(manager!=null){
+          manager.cancel(
+            webNotificationId(
+              notification
+            )
+          );
+        }
+      }catch(Exception ignored){}
+
+      try{
+        notification.dismiss();
+      }catch(Exception ignored){}
+    });
+  }
+
+  GeckoResult<Integer>
+  requestNotificationContentPermission(
+    ContentPermission permission
+  ){
+    if(
+      !NOTIFICATION_ENABLED ||
+      permission==null
+    ){
+      return GeckoResult.fromValue(
+        ContentPermission.VALUE_DENY
+      );
+    }
+
+    if(
+      Build.VERSION.SDK_INT<33 ||
+      hasAndroidPermission(
+        Manifest.permission.POST_NOTIFICATIONS
+      )
+    ){
+      return askContentPermission(
+        permission,
+        "notifications",
+        "Notifications"
+      );
+    }
+
+    if(
+      pendingNotificationPermissionResult!=null
+    ){
+      return GeckoResult.fromValue(
+        ContentPermission.VALUE_DENY
+      );
+    }
+
+    final GeckoResult<Integer> result=
+      new GeckoResult<>();
+
+    pendingNotificationPermissionResult=
+      result;
+
+    pendingNotificationContentPermission=
+      permission;
+
+    runOnUiThread(()->{
+      try{
+        requestPermissions(
+          new String[]{
+            Manifest.permission.POST_NOTIFICATIONS
+          },
+          RUNTIME_NOTIFICATION_PERMISSION_REQUEST
+        );
+
+      }catch(Exception error){
+        GeckoResult<Integer> pending=
+          pendingNotificationPermissionResult;
+
+        pendingNotificationPermissionResult=
+          null;
+
+        pendingNotificationContentPermission=
+          null;
+
+        if(pending!=null){
+          pending.complete(
+            ContentPermission.VALUE_DENY
+          );
+        }
+      }
+    });
+
+    return result;
   }
 
 
@@ -3131,23 +3404,6 @@ public class MainActivity extends Activity {
       grantResults
     );
 
-    if(
-      requestCode!=
-        RUNTIME_PERMISSION_REQUEST
-    ){
-      return;
-    }
-
-    GeckoSession.PermissionDelegate.Callback callback=
-      pendingAndroidPermissionCallback;
-
-    pendingAndroidPermissionCallback=
-      null;
-
-    if(callback==null){
-      return;
-    }
-
     boolean granted=true;
 
     if(
@@ -3164,6 +3420,71 @@ public class MainActivity extends Activity {
           break;
         }
       }
+    }
+
+    if(
+      requestCode==
+        RUNTIME_NOTIFICATION_PERMISSION_REQUEST
+    ){
+      GeckoResult<Integer> result=
+        pendingNotificationPermissionResult;
+
+      ContentPermission permission=
+        pendingNotificationContentPermission;
+
+      pendingNotificationPermissionResult=
+        null;
+
+      pendingNotificationContentPermission=
+        null;
+
+      if(result==null){
+        return;
+      }
+
+      if(
+        !granted ||
+        permission==null
+      ){
+        result.complete(
+          ContentPermission.VALUE_DENY
+        );
+        return;
+      }
+
+      askContentPermission(
+        permission,
+        "notifications",
+        "Notifications"
+      ).accept(
+        value->{
+          result.complete(value);
+        },
+        error->{
+          result.complete(
+            ContentPermission.VALUE_DENY
+          );
+        }
+      );
+
+      return;
+    }
+
+    if(
+      requestCode!=
+        RUNTIME_PERMISSION_REQUEST
+    ){
+      return;
+    }
+
+    GeckoSession.PermissionDelegate.Callback callback=
+      pendingAndroidPermissionCallback;
+
+    pendingAndroidPermissionCallback=
+      null;
+
+    if(callback==null){
+      return;
     }
 
     if(granted){

@@ -184,7 +184,19 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     'pendingAndroidPermissionCallback',
     'deviceBridgeCapabilitySummary',
     'Advanced bridge foundation only',
-    'showSitePermissionsManager'
+    'showSitePermissionsManager',
+    'setWebNotificationDelegate',
+    'WebNotificationDelegate',
+    'onShowNotification',
+    'onCloseNotification',
+    'NotificationChannel',
+    'jepong_web_notifications',
+    'showWebNotification',
+    'closeWebNotification',
+    'notification.show()',
+    'notification.dismiss()',
+    'RUNTIME_NOTIFICATION_PERMISSION_REQUEST',
+    'requestNotificationContentPermission'
   ];
 
 
