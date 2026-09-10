@@ -140,9 +140,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
           cd "work/$BUILD_ID/project/platforms/android"
-          gradle -p tools wrapper --gradle-version 8.14.2
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease --stacktrace
+          gradle --no-daemon assembleRelease --stacktrace
 
       - name: Locate final APK
         id: apk
