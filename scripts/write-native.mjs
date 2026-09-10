@@ -440,6 +440,9 @@ public class MainActivity extends Activity {
   final String WEB_NOTIFICATION_CHANNEL=
     "jepong_web_notifications";
 
+  final String WEB_NOTIFICATION_SILENT_CHANNEL=
+    "jepong_web_notifications_silent";
+
   final String WEB_NOTIFICATION_CHANNEL_NAME=
     ${javaString(cfg.appName+' web notifications')};
 
@@ -1204,6 +1207,28 @@ public class MainActivity extends Activity {
         channel
       );
 
+      NotificationChannel silentChannel=
+        new NotificationChannel(
+          WEB_NOTIFICATION_SILENT_CHANNEL,
+          WEB_NOTIFICATION_CHANNEL_NAME+" (silent)",
+          NotificationManager.IMPORTANCE_DEFAULT
+        );
+
+      silentChannel.setDescription(
+        "Silent notifications from approved websites"
+      );
+
+      silentChannel.setSound(
+        null,
+        null
+      );
+
+      silentChannel.enableVibration(false);
+
+      manager.createNotificationChannel(
+        silentChannel
+      );
+
     }catch(Exception ignored){}
   }
 
@@ -1269,10 +1294,15 @@ public class MainActivity extends Activity {
             ? notification.text
             : "";
 
+        String channelId=
+          notification.silent
+            ? WEB_NOTIFICATION_SILENT_CHANNEL
+            : WEB_NOTIFICATION_CHANNEL;
+
         Notification.Builder builder=
           new Notification.Builder(
             this,
-            WEB_NOTIFICATION_CHANNEL
+            channelId
           );
 
         builder
@@ -1291,10 +1321,6 @@ public class MainActivity extends Activity {
           .setOngoing(
             notification.requireInteraction
           );
-
-        if(notification.silent){
-          builder.setSilent(true);
-        }
 
         NotificationManager manager=
           (NotificationManager)

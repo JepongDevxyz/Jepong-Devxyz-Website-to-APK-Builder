@@ -120,17 +120,48 @@ for(const requiredSignerToken of [
   }
 
   if(
-    getSelectableFeatureIds(
+    getCapability('native','permissions','contacts').status!==
+      CAPABILITY_STATUS.EXPERIMENTAL
+  ){
+    throw new Error(
+      'Native Contacts foundation must remain Experimental'
+    );
+  }
+
+  if(
+    !getSelectableFeatureIds(
+      'native',
+      'permissions'
+    ).includes('contacts')
+  ){
+    throw new Error(
+      'Experimental Native Contacts must remain selectable'
+    );
+  }
+
+  if(
+    !getSelectableFeatureIds(
       'gecko',
       'permissions'
     ).includes('notification')
   ){
     throw new Error(
-      'Gecko notification must stay non-selectable until verification'
+      'Experimental Gecko Notifications must remain selectable'
     );
   }
 
-  const errors=
+  if(
+    !getSelectableFeatureIds(
+      'gecko',
+      'extensions'
+    ).includes('ublock')
+  ){
+    throw new Error(
+      'Experimental Gecko extensions must remain selectable'
+    );
+  }
+
+  const experimentalErrors=
     validateCapabilitySelection({
       engine:'native',
       permissions:['contacts'],
@@ -138,11 +169,26 @@ for(const requiredSignerToken of [
       extensions:[]
     });
 
-  if(errors.length===0){
+  if(experimentalErrors.length!==0){
     throw new Error(
-      'non-verified Native Contacts selection was accepted'
+      'Experimental capability was incorrectly rejected'
     );
   }
+
+  const unsupportedErrors=
+    validateCapabilitySelection({
+      engine:'native',
+      permissions:[],
+      controls:[],
+      extensions:['ublock']
+    });
+
+  if(unsupportedErrors.length===0){
+    throw new Error(
+      'Truly unsupported Native WebExtension was accepted'
+    );
+  }
+
 }
 
 
@@ -253,6 +299,52 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     fakePlatform(dir,'cordova');
     r=spawnSync(process.execPath,['scripts/patch-android-platform.mjs','--build-id',id,'--engine','cordova'],{cwd:root,encoding:'utf8'}); if(r.status!==0)throw new Error(`cordova patch: ${r.stderr}`);
     assertPatched(dir,'platforms/android');
+  }
+}
+
+
+/* Gecko Android notification compatibility regression */
+{
+  const notificationMain=
+    fs.readFileSync(
+      path.join(
+        root,
+        'work',
+        'test-gecko',
+        'project',
+        'app',
+        'src',
+        'main',
+        'java',
+        'com',
+        'jepongdevxyz',
+        'app',
+        'MainActivity.java'
+      ),
+      'utf8'
+    );
+
+  if(
+    notificationMain.includes(
+      'builder.setSilent(true)'
+    )
+  ){
+    throw new Error(
+      'gecko notification still uses invalid Notification.Builder.setSilent'
+    );
+  }
+
+  for(const token of [
+    'WEB_NOTIFICATION_SILENT_CHANNEL',
+    'jepong_web_notifications_silent',
+    'setSound(',
+    'enableVibration(false)'
+  ]){
+    if(!notificationMain.includes(token)){
+      throw new Error(
+        `gecko notification compatibility missing: ${token}`
+      );
+    }
   }
 }
 

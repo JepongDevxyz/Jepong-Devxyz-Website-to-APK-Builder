@@ -129,8 +129,12 @@ native.permissions.files=
   );
 
 native.permissions.notification=
-  unsupported(
-    'Normal Web Notification display is not yet implemented in Native WebView'
+  cap(
+    E,
+    'native-android-notification-foundation',
+    true,
+    false,
+    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
   );
 
 for(const id of [
@@ -142,8 +146,12 @@ for(const id of [
   'sensors'
 ]){
   native.permissions[id]=
-    unsupported(
-      'Android permission wiring alone does not expose this capability to website JavaScript'
+    cap(
+      E,
+      'native-android-permission-foundation',
+      true,
+      false,
+      'Android permission wiring exists; complete website-facing native effect is still being added'
     );
 }
 
@@ -226,8 +234,12 @@ for(const id of [
   'sensors'
 ]){
   gecko.permissions[id]=
-    unsupported(
-      'Android permission/foundation exists but no complete website-facing API is implemented'
+    cap(
+      E,
+      'geckoview-android-permission-foundation',
+      true,
+      false,
+      'Android permission foundation exists; complete website-facing native effect is still being added'
     );
 }
 
@@ -305,8 +317,12 @@ for(const id of [
 }
 
 capacitor.permissions.notification=
-  unsupported(
-    'Normal Web Notification display has not yet been implemented for the generated Capacitor app'
+  cap(
+    E,
+    'capacitor-android-notification-foundation',
+    true,
+    false,
+    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
   );
 
 for(const id of [
@@ -318,8 +334,12 @@ for(const id of [
   'sensors'
 ]){
   capacitor.permissions[id]=
-    unsupported(
-      'Runtime Android permission wiring alone is not a complete website-facing capability'
+    cap(
+      E,
+      'capacitor-android-permission-foundation',
+      true,
+      false,
+      'Android permission wiring exists; complete website-facing native effect is still being added'
     );
 }
 
@@ -358,8 +378,12 @@ for(const id of [
 }
 
 cordova.permissions.notification=
-  unsupported(
-    'Normal Web Notification display has not yet been implemented for the generated Cordova app'
+  cap(
+    E,
+    'cordova-android-notification-foundation',
+    true,
+    false,
+    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
   );
 
 for(const id of [
@@ -371,8 +395,12 @@ for(const id of [
   'sensors'
 ]){
   cordova.permissions[id]=
-    unsupported(
-      'Runtime Android permission wiring alone is not a complete website-facing capability'
+    cap(
+      E,
+      'cordova-android-permission-foundation',
+      true,
+      false,
+      'Android permission wiring exists; complete website-facing native effect is still being added'
     );
 }
 
@@ -443,7 +471,7 @@ export function getSelectableFeatureIds(
           engine,
           group,
           feature.id
-        ).status===CAPABILITY_STATUS.VERIFIED
+        ).status!==CAPABILITY_STATUS.UNSUPPORTED
     )
     .map(
       feature=>feature.id
@@ -487,8 +515,8 @@ export function validateCapabilitySelection(
         );
 
       if(
-        capability.status!==
-          CAPABILITY_STATUS.VERIFIED
+        capability.status===
+          CAPABILITY_STATUS.UNSUPPORTED
       ){
         errors.push(
           `${id} is ${capability.status} on ${config.engine}: ${capability.reason}`

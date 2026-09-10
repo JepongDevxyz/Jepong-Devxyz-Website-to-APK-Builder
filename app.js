@@ -102,7 +102,7 @@ const statusMeta={
 
   [CAPABILITY_STATUS.EXPERIMENTAL]:{
     label:'Experimental',
-    selectable:false
+    selectable:true
   },
 
   [CAPABILITY_STATUS.UNSUPPORTED]:{
@@ -305,7 +305,7 @@ function updateCompat(){
   }
 
   $('#compatNote').textContent=
-    `${META[eng].note} Only runtime-verified capabilities can be selected normally. Experimental and Unsupported options remain visible for transparency.`;
+    `${META[eng].note} Verified features are runtime-proven. Experimental features remain selectable while their full native effects are being completed. Unsupported features are disabled.`;
 
   updateSizeOptimizationUI();
   updateCount();
