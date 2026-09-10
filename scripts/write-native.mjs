@@ -160,12 +160,12 @@ function geckoActivity(cfg) {
     }))
     .filter(x=>x.slug);
 
-  const extensionRows=selected.map(x=>\`
-    keys.add(\${javaString(x.key)});
-    slugs.add(\${javaString(x.slug)});
-    names.add(\${javaString(x.label)});
-    urls.add("https://addons.mozilla.org/firefox/downloads/latest/\${x.slug}/latest.xpi");
-  \`).join('\\n');
+  const extensionRows=selected.map(x=>`
+    keys.add(${javaString(x.key)});
+    slugs.add(${javaString(x.slug)});
+    names.add(${javaString(x.label)});
+    urls.add("https://addons.mozilla.org/firefox/downloads/latest/${x.slug}/latest.xpi");
+  `).join('\n');
 
   const transparent=
     (cfg.controls||[])
@@ -174,7 +174,7 @@ function geckoActivity(cfg) {
   const hard=
     cfg.renderMode==='hardware';
 
-  return \`package \${cfg.packageName};
+  return `package ${cfg.packageName};
 
 import android.Manifest;
 import android.app.Activity;
@@ -190,7 +190,7 @@ import org.mozilla.geckoview.*;
 
 public class MainActivity extends Activity {
 
-  final String HOME=\${javaString(cfg.websiteUrl)};
+  final String HOME=${javaString(cfg.websiteUrl)};
 
   GeckoRuntime runtime;
   GeckoSession session;
@@ -232,7 +232,7 @@ public class MainActivity extends Activity {
   public void onCreate(Bundle state){
     super.onCreate(state);
 
-    \${transparent ? \`
+    ${transparent ? `
     if(Build.VERSION.SDK_INT>=29){
       getWindow()
         .setNavigationBarColor(
@@ -243,12 +243,12 @@ public class MainActivity extends Activity {
         .setStatusBarColor(
           Color.TRANSPARENT
         );
-    }\` : ''}
+    }` : ''}
 
     begin();
   }
 
-  \${splashMethods(cfg)}
+  ${splashMethods(cfg)}
 
   int dp(int value){
     return (int)(
@@ -475,7 +475,7 @@ public class MainActivity extends Activity {
     view=
       new GeckoView(this);
 
-    \${hard
+    ${hard
       ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);'
       : ''}
 
@@ -540,7 +540,7 @@ public class MainActivity extends Activity {
 
     TextView appTitle=
       makeText(
-        \${javaString(cfg.appName)},
+        ${javaString(cfg.appName)},
         23f,
         Color.WHITE
       );
@@ -744,7 +744,7 @@ public class MainActivity extends Activity {
     final ArrayList<String> urls=
       new ArrayList<>();
 
-    \${extensionRows}
+    ${extensionRows}
 
     if(keys.isEmpty()){
       loadingBar.setProgress(80);
@@ -1598,6 +1598,6 @@ public class MainActivity extends Activity {
     }
   }
 }
-\`;
+`;
 }
 
