@@ -1,0 +1,27 @@
+{
+  "websiteUrl": "https://pinoymovieshub.win",
+  "appName": "Test No Ads",
+  "packageName": "com.jepongdevxyz.app",
+  "versionName": "1.2.3",
+  "versionCode": 3,
+  "engine": "gecko",
+  "renderMode": "default",
+  "orientation": "landscape",
+  "permissions": [],
+  "controls": [],
+  "extensions": [
+    "adguard",
+    "ghostery",
+    "privacyBadger",
+    "ublock"
+  ],
+  "splashEnabled": true,
+  "splashDuration": 5000,
+  "oneSignalAppId": "",
+  "offlineFallback": "You appear to be offline. Check your connection and try again.",
+  "iconDataUrl": "",
+  "splashDataUrl": "",
+  "buildId": "jpx-mtv7jtjw-69bb36",
+  "createdAt": "2026-09-10T07:30:31.389Z",
+  "schemaVersion": 1
+}
