@@ -50,7 +50,11 @@ jobs:
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          if [ "$ENGINE" = "gecko" ]; then
+            sdkmanager "platform-tools" "platforms;android-37.1" "build-tools;37.0.0"
+          else
+            sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          fi
 
       - name: Run generator tests
         run: npm test
@@ -136,6 +140,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
           cd "work/$BUILD_ID/project/platforms/android"
+          gradle -p tools wrapper --gradle-version 8.14.2
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease --stacktrace
 
