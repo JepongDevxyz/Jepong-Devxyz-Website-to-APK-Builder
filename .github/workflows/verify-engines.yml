@@ -1,0 +1,130 @@
+name: Verify All APK Engines
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [native, gecko, capacitor, cordova]
+    env:
+      ENGINE: ${{ matrix.engine }}
+      BUILD_ID: ci-${{ matrix.engine }}
+    steps:
+      - name: Checkout builder
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21 for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Java 17
+        if: matrix.engine != 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Run generator tests
+        run: npm test
+
+      - name: Validate build configuration
+        run: node scripts/build.mjs prepare --build-id "$BUILD_ID"
+
+      - name: Generate engine project
+        run: node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Setup Gradle 9.6 for Native/Gecko
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build Native/Gecko APK
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          gradle --no-daemon :app:assembleRelease --stacktrace
+
+      - name: Setup Gradle for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Build Capacitor APK
+        if: matrix.engine == 'capacitor'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cap add android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine capacitor
+          cd "work/$BUILD_ID/project/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease --stacktrace
+
+      - name: Setup Gradle for Cordova
+        if: matrix.engine == 'cordova'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.2'
+
+      - name: Build Cordova APK
+        if: matrix.engine == 'cordova'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cordova platform add android@15.1.0
+          npx cordova prepare android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
+          cd "work/$BUILD_ID/project/platforms/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease --stacktrace
+
+      - name: Locate final APK
+        id: apk
+        shell: bash
+        run: |
+          APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          ls -lh "$APK"
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-${{ matrix.engine }}-apk
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,6 @@
+.env
+.vercel
+node_modules
+work
+builds/*.json
+.DS_Store

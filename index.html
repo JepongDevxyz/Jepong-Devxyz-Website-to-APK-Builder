@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Jepong Devxyz · Website to APK Builder</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><div class="brandmark">J</div><div><strong>Jepong Devxyz</strong><span>Website → APK Builder</span></div></div>
+      <div class="top-actions">
+        <button class="btn ghost" id="loadPresetBtn" data-icon="folder-open">Load preset</button>
+        <button class="btn ghost" id="savePresetBtn" data-icon="save">Save preset</button>
+        <button class="btn ghost" id="themeBtn" data-icon="moon" aria-label="Toggle theme"></button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel builder-panel">
+        <div class="section-head"><div><h1>Build your Android app</h1><p>Turn a website into an APK using a pinned, engine-specific Android toolchain.</p></div><span class="status-pill">Production profile</span></div>
+
+        <div class="grid two">
+          <label class="field span-2"><span>Website URL</span><input id="websiteUrl" type="url" value="https://example.com" placeholder="https://yourwebsite.com" /></label>
+          <label class="field"><span>App name</span><input id="appName" value="Jepong Devxyz" /></label>
+          <label class="field"><span>Package name</span><input id="packageName" value="com.jepongdevxyz.app" /></label>
+          <label class="field"><span>Version name</span><input id="versionName" value="1.0.0" /></label>
+          <label class="field"><span>Version code</span><input id="versionCode" type="number" min="1" value="1" /></label>
+        </div>
+
+        <div class="divider"></div>
+        <div class="grid three">
+          <label class="field"><span>Engine</span><select id="engine"><option value="native">Native WebView</option><option value="gecko">GeckoView</option><option value="capacitor">Capacitor</option><option value="cordova">Cordova</option></select></label>
+          <label class="field"><span>Render mode</span><select id="renderMode"><option value="default">Default</option><option value="hardware">Hardware acceleration</option><option value="software">Software rendering</option></select></label>
+          <label class="field"><span>Orientation</span><select id="orientation"><option value="auto">Auto scale</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+        </div>
+
+        <div class="dropdown-grid">
+          <details class="picker" id="permissionsPicker"><summary><span><b>Device Permissions</b><small id="permissionCount">0 selected</small></span><span class="chev">⌄</span></summary><div class="picker-body" id="permissionsList"></div></details>
+          <details class="picker" id="controlsPicker"><summary><span><b>Website Controls</b><small id="controlCount">0 selected</small></span><span class="chev">⌄</span></summary><div class="picker-body" id="controlsList"></div></details>
+          <details class="picker" id="extensionsPicker"><summary><span><b>Extensions</b><small id="extensionCount">0 selected</small></span><span class="chev">⌄</span></summary><div class="picker-body" id="extensionsList"></div></details>
+        </div>
+
+        <div class="divider"></div>
+        <h2>App configuration</h2>
+        <div class="grid two">
+          <div class="field upload-card"><span>App icon</span><div class="upload-row"><div class="asset-preview" id="iconPreview">J</div><div><input id="iconInput" type="file" accept="image/*" /><small>Auto converts supported image formats to compressed PNG. Falls back to Jepong Devxyz.</small></div></div></div>
+          <div class="field upload-card"><span>Splash screen</span><div class="upload-row"><div class="asset-preview tall" id="splashPreview">J</div><div><input id="splashInput" type="file" accept="image/*" /><small>Compressed before upload. Default branding is used when empty.</small></div></div></div>
+          <label class="switch-field"><span><b>Splash Screen</b><small>Show branded splash before the website.</small></span><input id="splashEnabled" type="checkbox" checked /><i></i></label>
+          <label class="field"><span>Splash duration (ms)</span><input id="splashDuration" type="number" min="0" max="10000" step="100" value="1500" /></label>
+          <label class="field"><span>OneSignal App ID</span><input id="oneSignalAppId" placeholder="Optional UUID" /></label>
+          <label class="field"><span>Offline fallback</span><input id="offlineFallback" value="You appear to be offline. Check your connection and try again." /></label>
+        </div>
+
+        <div class="compat-note" id="compatNote"></div>
+        <button class="btn primary build-btn" id="buildBtn"><span data-icon="hammer"></span>Generate & Build APK</button>
+
+        <section class="build-state hidden" id="buildState">
+          <div class="build-state-head"><div><b id="buildTitle">Preparing build…</b><span id="buildSubtitle">GitHub Actions</span></div><button class="btn ghost small" id="logsBtn" data-icon="terminal">View logs</button></div>
+          <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+          <div class="progress-meta"><span id="progressText">0%</span><span id="currentStep">Queued</span></div>
+        </section>
+
+        <section class="success-card hidden" id="successCard"><div class="success-icon">✓</div><div><b>APK Build Successful</b><span>Your APK is ready.</span></div><a class="btn primary" id="downloadBtn" href="#" download data-icon="download">Download APK</a></section>
+      </section>
+
+      <aside class="panel history-panel">
+        <div class="section-head compact"><div><h2>Build history</h2><p>Local presets + GitHub build status.</p></div><button class="icon-btn" id="refreshHistory" data-icon="refresh-cw" aria-label="Refresh"></button></div>
+        <div id="historyList" class="history-list"><div class="empty">No builds yet.</div></div>
+        <div class="stack-card"><b>Pinned toolchains</b><dl><div><dt>Native</dt><dd>AGP 9.4 / Gradle 9.6 / JDK 17</dd></div><div><dt>Gecko</dt><dd>GeckoView 154 stable / JDK 17</dd></div><div><dt>Capacitor</dt><dd>8.5.0 / JDK 21</dd></div><div><dt>Cordova</dt><dd>CLI 13 / Android 15.1</dd></div></dl></div>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="logsModal"><div class="modal-head"><div><b>GitHub build logs</b><span id="logsBuildId"></span></div><button class="icon-btn" id="closeLogs" data-icon="x"></button></div><pre id="logsText">Waiting for logs…</pre></dialog>
+  <dialog id="presetModal"><div class="modal-head"><div><b>Saved presets</b><span>Stored in this browser.</span></div><button class="icon-btn" id="closePresets" data-icon="x"></button></div><div id="presetList" class="preset-list"></div></dialog>
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
