@@ -8,9 +8,14 @@ for(const f of required) if(!fs.existsSync(path.join(root,f))) throw new Error(`
 const checks=['app.js','api/_common.js','api/_github.js','api/build-create.js','api/build-status.js','api/build-logs.js','api/build-download.js','scripts/build.mjs','scripts/common.mjs','scripts/write-native.mjs','scripts/write-capacitor.mjs','scripts/write-cordova.mjs','scripts/patch-android-platform.mjs'];
 for(const f of checks){ const r=spawnSync(process.execPath,['--check',f],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${f}: ${r.stderr}`); }
 const y=spawnSync('python3',['-c',`import yaml; yaml.safe_load(open('.github/workflows/build-apk.yml')); print('yaml ok')`],{cwd:root,encoding:'utf8'}); if(y.status!==0)throw new Error(`workflow YAML: ${y.stderr}`);
-const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:['camera','notification','media','bluetooth'],controls:['hideScrollbars','transparentNav'],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500};
+const allPermissions=['camera','microphone','notification','location','media','contacts','calendar','biometrics','files','bluetooth','sensors'];
+const nativeControls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects'];
+const geckoExtensions=['adguard','ghostery','privacyBadger','darkReader','ublock'];
+const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:allPermissions,controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500};
 for(const engine of ['native','gecko','capacitor','cordova']){
-  const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); fs.writeFileSync(path.join(root,'builds',`${id}.json`),JSON.stringify({...base,engine,extensions:engine==='gecko'?['ublock']:[]}));
+  const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav']:['transparentNav','pinchZoom'];
+  const extensions=engine==='gecko'?geckoExtensions:[];
+  fs.writeFileSync(path.join(root,'builds',`${id}.json`),JSON.stringify({...base,engine,controls,extensions}));
   let r=spawnSync(process.execPath,['scripts/build.mjs','prepare','--build-id',id],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${engine} prepare: ${r.stderr}`);
   r=spawnSync(process.execPath,['scripts/build.mjs','generate','--build-id',id],{cwd:root,encoding:'utf8'}); if(r.status!==0) throw new Error(`${engine} generate: ${r.stderr}`);
   const dir=path.join(root,'work',id,'project'); if(!fs.existsSync(dir)) throw new Error(`${engine}: no project`);
@@ -18,7 +23,12 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     if(!fs.existsSync(path.join(dir,'app/src/main/AndroidManifest.xml'))) throw new Error(`${engine}: no manifest`);
     for(const a of ['app_icon.png','app_splash.png']) if(!fs.existsSync(path.join(dir,'app/src/main/res/drawable-nodpi',a))) throw new Error(`${engine}: missing ${a}`);
     const main=fs.readFileSync(path.join(dir,'app/src/main/java/com/jepongdevxyz/app/MainActivity.java'),'utf8'); if(!main.includes('app_splash'))throw new Error(`${engine}: splash not wired`);
-    if(engine==='gecko'&&!main.includes('setPromptDelegate'))throw new Error('gecko: extension prompt delegate not wired');
+    if(engine==='gecko'){
+      if(!main.includes('setPromptDelegate'))throw new Error('gecko: extension prompt delegate not wired');
+      for(const slug of ['adguard-adblocker','ghostery','privacy-badger17','darkreader','ublock-origin']){
+        if(!main.includes(slug))throw new Error(`gecko: extension ${slug} not wired`);
+      }
+    }
   }
   if(engine==='capacitor'){
     if(!fs.existsSync(path.join(dir,'capacitor.config.json'))) throw new Error('capacitor config missing');
@@ -49,5 +59,8 @@ function assertPatched(dir,sub){
   if(!manifest.includes('@drawable/app_icon')||!manifest.includes('.JepongApplication')||!manifest.includes('android.permission.CAMERA')) throw new Error(`${sub}: manifest patch incomplete`);
   const gradle=fs.readFileSync(path.join(app,'build.gradle'),'utf8'); if(!gradle.includes('com.onesignal:OneSignal:5.9.8'))throw new Error(`${sub}: OneSignal dependency missing`);
   for(const a of ['app_icon.png','app_splash.png']) if(!fs.existsSync(path.join(app,'src/main/res/drawable-nodpi',a)))throw new Error(`${sub}: missing ${a}`);
-  const main=fs.readFileSync(path.join(app,'src/main/java/com/jepongdevxyz/app/MainActivity.java'),'utf8'); if(!main.includes('app_splash'))throw new Error(`${sub}: full splash overlay missing`);
+  const main=fs.readFileSync(path.join(app,'src/main/java/com/jepongdevxyz/app/MainActivity.java'),'utf8');
+  if(!main.includes('app_splash'))throw new Error(`${sub}: full splash overlay missing`);
+  if(!main.includes('requestSelectedPermissions'))throw new Error(`${sub}: runtime permissions not wired`);
+  if(!main.includes('setBuiltInZoomControls(true)'))throw new Error(`${sub}: pinch zoom not wired`);
 }

@@ -63,6 +63,23 @@ jobs:
         shell: bash
         run: |
           mkdir -p builds
+
+          PERMISSIONS='["camera","microphone","notification","location","media","contacts","calendar","biometrics","files","bluetooth","sensors"]'
+
+          case "$ENGINE" in
+            native)
+              CONTROLS='["pullRefresh","hideScrollbars","transparentNav","pinchZoom","disableCopy","blockAdsRedirects"]'
+              EXTENSIONS='[]'
+              ;;
+            gecko)
+              CONTROLS='["transparentNav"]'
+              EXTENSIONS='["adguard","ghostery","privacyBadger","darkReader","ublock"]'
+              ;;
+            capacitor|cordova)
+              CONTROLS='["transparentNav","pinchZoom"]'
+              EXTENSIONS='[]'
+              ;;
+          esac
           cat > "builds/$BUILD_ID.json" <<EOF
           {
             "websiteUrl": "https://example.com",
@@ -73,9 +90,9 @@ jobs:
             "engine": "$ENGINE",
             "renderMode": "default",
             "orientation": "auto",
-            "permissions": ["camera", "notification", "media", "bluetooth"],
-            "controls": ["hideScrollbars", "transparentNav"],
-            "extensions": [],
+            "permissions": $PERMISSIONS,
+            "controls": $CONTROLS,
+            "extensions": $EXTENSIONS,
             "oneSignalAppId": "11111111-1111-1111-1111-111111111111",
             "offlineFallback": "Offline",
             "iconDataUrl": "",

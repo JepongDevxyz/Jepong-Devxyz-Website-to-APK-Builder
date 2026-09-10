@@ -65,15 +65,122 @@ function writeOneSignalApplication(){
  const p=path.join(appRoot,'src/main/java',...cfg.packageName.split('.'),'JepongApplication.java');
  write(p,`package ${cfg.packageName};\nimport android.app.Application;\nimport com.onesignal.OneSignal;\npublic class JepongApplication extends Application { @Override public void onCreate(){ super.onCreate(); OneSignal.initWithContext(this, ${javaString(cfg.oneSignalAppId)}); } }\n`);
 }
+function runtimePermissionBuilder(cfg){
+ const p=cfg.permissions||[];
+ const lines=[];
+ if(p.includes('camera')) lines.push('p.add(Manifest.permission.CAMERA);');
+ if(p.includes('microphone')) lines.push('p.add(Manifest.permission.RECORD_AUDIO);');
+ if(p.includes('location')) lines.push('p.add(Manifest.permission.ACCESS_FINE_LOCATION); p.add(Manifest.permission.ACCESS_COARSE_LOCATION);');
+ if(p.includes('contacts')) lines.push('p.add(Manifest.permission.READ_CONTACTS);');
+ if(p.includes('calendar')) lines.push('p.add(Manifest.permission.READ_CALENDAR); p.add(Manifest.permission.WRITE_CALENDAR);');
+ if(p.includes('sensors')) lines.push('p.add(Manifest.permission.BODY_SENSORS);');
+ if(p.includes('notification')) lines.push('if(Build.VERSION.SDK_INT>=33) p.add(Manifest.permission.POST_NOTIFICATIONS);');
+ if(p.includes('media')) lines.push('if(Build.VERSION.SDK_INT>=33){ p.add(Manifest.permission.READ_MEDIA_IMAGES); p.add(Manifest.permission.READ_MEDIA_VIDEO); } else { p.add(Manifest.permission.READ_EXTERNAL_STORAGE); }');
+ if(p.includes('bluetooth')) lines.push('if(Build.VERSION.SDK_INT>=31){ p.add(Manifest.permission.BLUETOOTH_SCAN); p.add(Manifest.permission.BLUETOOTH_CONNECT); }');
+ return lines.join('\n    ');
+}
+
 function activityBody(base){
  const layer=cfg.renderMode==='software'?'View.LAYER_TYPE_SOFTWARE':cfg.renderMode==='hardware'?'View.LAYER_TYPE_HARDWARE':'View.LAYER_TYPE_NONE';
  const transparent=(cfg.controls||[]).includes('transparentNav');
+ const zoom=(cfg.controls||[]).includes('pinchZoom');
  const splash=cfg.splashEnabled!==false;
  const duration=Math.max(0,Math.min(15000,Number(cfg.splashDuration)||1500));
+
  const common=`${transparent?'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}':''}`;
+
  const overlay=splash?`ImageView brandSplash=new ImageView(this); brandSplash.setImageResource(R.drawable.app_splash); brandSplash.setScaleType(ImageView.ScaleType.CENTER_CROP); brandSplash.setBackgroundColor(Color.rgb(17,24,39)); addContentView(brandSplash,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT)); brandSplash.bringToFront(); new Handler(Looper.getMainLooper()).postDelayed(()->{ ViewParent parent=brandSplash.getParent(); if(parent instanceof ViewGroup)((ViewGroup)parent).removeView(brandSplash); },${duration});`:'';
- if(base==='capacitor') return `package ${cfg.packageName};\n\nimport android.os.*;\nimport android.graphics.Color;\nimport android.view.*;\nimport android.widget.ImageView;\nimport android.webkit.WebView;\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n  @Override protected void onCreate(Bundle savedInstanceState){ super.onCreate(savedInstanceState); ${common} WebView w=getBridge()!=null?getBridge().getWebView():null; if(w!=null)w.setLayerType(${layer},null); ${overlay} }\n}\n`;
- return `package ${cfg.packageName};\n\nimport android.os.*;\nimport android.graphics.Color;\nimport android.view.*;\nimport android.widget.ImageView;\nimport org.apache.cordova.CordovaActivity;\n\npublic class MainActivity extends CordovaActivity {\n  @Override public void onCreate(Bundle savedInstanceState){ super.onCreate(savedInstanceState); ${common} loadUrl(launchUrl); if(appView!=null&&appView.getView()!=null) appView.getView().setLayerType(${layer},null); ${overlay} }\n  @Override protected boolean showInitialSplashScreen(){ return ${splash}; }\n}\n`;
+
+ const permissionMethods=`
+  String[] wantedPermissions(){
+    ArrayList<String> p=new ArrayList<>();
+    ${runtimePermissionBuilder(cfg)}
+    return p.toArray(new String[0]);
+  }
+
+  void requestSelectedPermissions(){
+    if(Build.VERSION.SDK_INT<23)return;
+    ArrayList<String> missing=new ArrayList<>();
+    for(String permission:wantedPermissions()){
+      if(checkSelfPermission(permission)!=PackageManager.PERMISSION_GRANTED){
+        missing.add(permission);
+      }
+    }
+    if(!missing.isEmpty()){
+      requestPermissions(missing.toArray(new String[0]),700);
+    }
+  }
+ `;
+
+ const webSettings=`if(w!=null){
+   w.setLayerType(${layer},null);
+   WebSettings ws=w.getSettings();
+   ws.setBuiltInZoomControls(${zoom});
+   ws.setDisplayZoomControls(false);
+   ws.setSupportZoom(${zoom});
+ }`;
+
+ if(base==='capacitor') return `package ${cfg.packageName};
+
+import android.Manifest;
+import android.os.*;
+import android.graphics.Color;
+import android.view.*;
+import android.widget.ImageView;
+import android.webkit.*;
+import android.content.pm.PackageManager;
+import java.util.ArrayList;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+  @Override protected void onCreate(Bundle savedInstanceState){
+    super.onCreate(savedInstanceState);
+    ${common}
+    requestSelectedPermissions();
+    WebView w=getBridge()!=null?getBridge().getWebView():null;
+    ${webSettings}
+    ${overlay}
+  }
+
+  ${permissionMethods}
+}
+`;
+
+ return `package ${cfg.packageName};
+
+import android.Manifest;
+import android.os.*;
+import android.graphics.Color;
+import android.view.*;
+import android.widget.ImageView;
+import android.webkit.*;
+import android.content.pm.PackageManager;
+import java.util.ArrayList;
+import org.apache.cordova.CordovaActivity;
+
+public class MainActivity extends CordovaActivity {
+  @Override public void onCreate(Bundle savedInstanceState){
+    super.onCreate(savedInstanceState);
+    ${common}
+    requestSelectedPermissions();
+    loadUrl(launchUrl);
+
+    View raw=appView!=null?appView.getView():null;
+    if(raw instanceof WebView){
+      WebView w=(WebView)raw;
+      ${webSettings}
+    }
+
+    ${overlay}
+  }
+
+  @Override protected boolean showInitialSplashScreen(){
+    return ${splash};
+  }
+
+  ${permissionMethods}
+}
+`;
 }
 function writeActivity(){
  const javaRoot=path.join(appRoot,'src/main/java');

@@ -17,7 +17,7 @@ const CONTROLS=[['pullRefresh','Pull-Down Refresh'],['hideScrollbars','Hide scro
 const EXTENSIONS=[['adguard','AdGuard AdBlocker'],['ghostery','Ghostery AdBlocker'],['privacyBadger','Privacy Badger'],['darkReader','Dark Reader'],['ublock','uBlock Origin']];
 const COMPAT={
   native:{render:{default:1,hardware:1,software:1},permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),controls:{pullRefresh:1,hideScrollbars:1,transparentNav:1,pinchZoom:1,disableCopy:1,blockAdsRedirects:1,adguardDns:0},extensions:{}},
-  gecko:{render:{default:1,hardware:1,software:0},permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),controls:{pullRefresh:0,hideScrollbars:0,transparentNav:1,pinchZoom:1,disableCopy:0,blockAdsRedirects:0,adguardDns:0},extensions:Object.fromEntries(EXTENSIONS.map(([k])=>[k,1]))},
+  gecko:{render:{default:1,hardware:1,software:0},permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),controls:{pullRefresh:0,hideScrollbars:0,transparentNav:1,pinchZoom:0,disableCopy:0,blockAdsRedirects:0,adguardDns:0},extensions:Object.fromEntries(EXTENSIONS.map(([k])=>[k,1]))},
   capacitor:{render:{default:1,hardware:1,software:1},permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),controls:{pullRefresh:0,hideScrollbars:0,transparentNav:1,pinchZoom:1,disableCopy:0,blockAdsRedirects:0,adguardDns:0},extensions:{}},
   cordova:{render:{default:1,hardware:1,software:1},permissions:Object.fromEntries(PERMISSIONS.map(([k])=>[k,1])),controls:{pullRefresh:0,hideScrollbars:0,transparentNav:1,pinchZoom:1,disableCopy:0,blockAdsRedirects:0,adguardDns:0},extensions:{}}
 };
