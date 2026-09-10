@@ -173,6 +173,15 @@ for(const id of [
     );
 }
 
+native.controls.navigationToolbar=
+  cap(
+    E,
+    'native-webview-navigation-toolbar',
+    false,
+    false,
+    'Native navigation toolbar generator is implemented; Android CI and physical runtime verification are pending'
+  );
+
 /* -------------------------------------------------
    GeckoView
    Camera, microphone and location have already been
