@@ -134,5 +134,47 @@ function geckoActivity(cfg) {
   const installs=(cfg.extensions||[]).map(x=>extMap[x]).filter(Boolean).map(slug=>`controller.install("https://addons.mozilla.org/firefox/downloads/latest/${slug}/latest.xpi").exceptionally(e->{ android.util.Log.w("JepongExt", "Extension install failed: ${slug}", e); return null; });`).join('\n    ');
   const transparent=(cfg.controls||[]).includes('transparentNav');
   const hard=cfg.renderMode==='hardware';
-  return `package ${cfg.packageName};\n\nimport android.Manifest;\nimport android.app.Activity;\nimport android.os.*;\nimport android.graphics.Color;\nimport android.view.View;\nimport android.content.pm.PackageManager;\nimport android.widget.ImageView;\nimport java.util.*;\nimport org.mozilla.geckoview.*;\n\npublic class MainActivity extends Activity {\n  GeckoRuntime runtime; GeckoSession session; GeckoView view; boolean started=false;\n  @Override public void onCreate(Bundle b){ super.onCreate(b); ${transparent ? 'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}' : ''} begin(); }\n  ${splashMethods(cfg)}\n  void startBrowser(){ if(started)return; started=true; view=new GeckoView(this); ${hard ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);' : ''} setContentView(view); runtime=GeckoRuntime.create(this);\n    WebExtensionController controller=runtime.getWebExtensionController();\n    controller.setPromptDelegate(new WebExtensionController.PromptDelegate(){\n      @Override public GeckoResult<WebExtension.PermissionPromptResponse> onInstallPromptRequest(WebExtension extension,String[] permissions,String[] origins,String[] dataCollectionPermissions){ return GeckoResult.fromValue(new WebExtension.PermissionPromptResponse(true,false,false)); }\n      @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension,String[] permissions,String[] origins,String[] dataCollectionPermissions){ return GeckoResult.fromValue(AllowOrDeny.ALLOW); }\n      @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension,String[] newPermissions,String[] newOrigins,String[] newDataCollectionPermissions){ return GeckoResult.fromValue(AllowOrDeny.ALLOW); }\n    });\n    session=new GeckoSession();\n    session.setPermissionDelegate(new GeckoSession.PermissionDelegate(){\n      @Override public void onAndroidPermissionsRequest(GeckoSession s,String[] permissions,Callback cb){ boolean ok=true; if(permissions!=null) for(String x:permissions) if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(x)!=PackageManager.PERMISSION_GRANTED) ok=false; if(ok)cb.grant(); else cb.reject(); }\n      @Override public GeckoResult<Integer> onContentPermissionRequest(GeckoSession s,ContentPermission perm){ return GeckoResult.fromValue(ContentPermission.VALUE_ALLOW); }\n      @Override public void onMediaPermissionRequest(GeckoSession s,String uri,MediaSource[] video,MediaSource[] audio,MediaCallback cb){ MediaSource v=(video!=null&&video.length>0)?video[0]:null; MediaSource a=(audio!=null&&audio.length>0)?audio[0]:null; cb.grant(v,a); }\n    });\n    session.open(runtime); view.setSession(session); session.loadUri(${javaString(cfg.websiteUrl)});\n    ${installs}\n  }\n  @Override public void onBackPressed(){ if(session!=null) session.goBack(); else super.onBackPressed(); }\n}\n`;
+  return `package ${cfg.packageName};\n\nimport android.Manifest;\nimport android.app.Activity;\nimport android.os.*;\nimport android.graphics.Color;\nimport android.view.View;\nimport android.content.pm.PackageManager;\nimport android.widget.ImageView;\nimport java.util.*;\nimport org.mozilla.geckoview.*;\n\npublic class MainActivity extends Activity {\n  GeckoRuntime runtime; GeckoSession session; GeckoView view; boolean started=false;\n  @Override public void onCreate(Bundle b){ super.onCreate(b); ${transparent ? 'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}' : ''} begin(); }\n  ${splashMethods(cfg)}\n  void startBrowser(){ if(started)return; started=true; view=new GeckoView(this); ${hard ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);' : ''} setContentView(view); runtime=GeckoRuntime.create(this);\n    WebExtensionController controller=runtime.getWebExtensionController();\n    controller.setPromptDelegate(new WebExtensionController.PromptDelegate(){\n      @Override public GeckoResult<WebExtension.PermissionPromptResponse> onInstallPromptRequest(WebExtension extension,String[] permissions,String[] origins,String[] dataCollectionPermissions){ return GeckoResult.fromValue(new WebExtension.PermissionPromptResponse(true,false,false)); }\n      @Override public GeckoResult<AllowOrDeny> onOptionalPrompt(WebExtension extension,String[] permissions,String[] origins,String[] dataCollectionPermissions){ return GeckoResult.fromValue(AllowOrDeny.ALLOW); }\n      @Override public GeckoResult<AllowOrDeny> onUpdatePrompt(WebExtension extension,String[] newPermissions,String[] newOrigins,String[] newDataCollectionPermissions){ return GeckoResult.fromValue(AllowOrDeny.ALLOW); }\n    });\n    session=new GeckoSession();\n    session.setPermissionDelegate(new GeckoSession.PermissionDelegate(){\n      @Override public void onAndroidPermissionsRequest(GeckoSession s,String[] permissions,Callback cb){ boolean ok=true; if(permissions!=null) for(String x:permissions) if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(x)!=PackageManager.PERMISSION_GRANTED) ok=false; if(ok)cb.grant(); else cb.reject(); }\n      @Override public GeckoResult<Integer> onContentPermissionRequest(GeckoSession s,ContentPermission perm){ return GeckoResult.fromValue(ContentPermission.VALUE_ALLOW); }\n      @Override public void onMediaPermissionRequest(GeckoSession s,String uri,MediaSource[] video,MediaSource[] audio,MediaCallback cb){ MediaSource v=(video!=null&&video.length>0)?video[0]:null; MediaSource a=(audio!=null&&audio.length>0)?audio[0]:null; cb.grant(v,a); }\n    });\n    session.open(runtime); view.setSession(session);\n    installExtensionsThenLoad(controller);\n  }\n  void installExtensionsThenLoad(WebExtensionController controller){
+    final String home=${javaString(cfg.websiteUrl)};
+    final java.util.ArrayList<String> urls=new java.util.ArrayList<>();
+    ${(cfg.extensions||[]).map(x=>extMap[x]).filter(Boolean).map(slug=>`urls.add("https://addons.mozilla.org/firefox/downloads/latest/${slug}/latest.xpi");`).join('\\n    ')}
+
+    if(urls.isEmpty()){
+      session.loadUri(home);
+      return;
+    }
+
+    final java.util.concurrent.atomic.AtomicInteger pending=
+      new java.util.concurrent.atomic.AtomicInteger(urls.size());
+
+    final Runnable done=()->{
+      if(pending.decrementAndGet()==0){
+        controller.list().accept(
+          list->{
+            android.util.Log.i("JepongExt","Extensions ready: "+list.size());
+            session.loadUri(home);
+          },
+          err->{
+            android.util.Log.e("JepongExt","Extension list failed",err);
+            session.loadUri(home);
+          }
+        );
+      }
+    };
+
+    for(String url:urls){
+      controller.install(url).accept(
+        extension->{
+          android.util.Log.i("JepongExt","Extension installed/enabled: "+extension.id);
+          done.run();
+        },
+        error->{
+          android.util.Log.w("JepongExt","Install returned error; checking persisted extensions",error);
+          done.run();
+        }
+      );
+    }
+  }
+
+    @Override public void onBackPressed(){ if(session!=null) session.goBack(); else super.onBackPressed(); }\n}\n`;
 }
