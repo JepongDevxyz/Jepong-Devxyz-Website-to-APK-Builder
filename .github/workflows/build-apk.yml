@@ -144,10 +144,9 @@ jobs:
         run: |
           ENABLED="$(node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('builds/'+process.env.BUILD_ID+'.json','utf8')); process.stdout.write(c.apkSigner===true?'true':'false')")"
           echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"
-          echo "APK signing enabled: $ENABLED"
+          echo "Private APK signing enabled: $ENABLED"
 
-      - name: Sign release APK with apksigner
-        if: steps.signing.outputs.enabled == 'true'
+      - name: Align and sign installable APK
         shell: bash
         env:
           APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
@@ -155,34 +154,103 @@ jobs:
           APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
           APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
         run: |
-          if [ -z "$APK_KEYSTORE_BASE64" ] ||              [ -z "$APK_KEYSTORE_PASSWORD" ] ||              [ -z "$APK_KEY_ALIAS" ] ||              [ -z "$APK_KEY_PASSWORD" ]; then
-            echo "::error::APK Signer is enabled but GitHub signing secrets are missing."
-            exit 1
-          fi
+          set -euo pipefail
 
-          KEYSTORE="$RUNNER_TEMP/jepong-release.jks"
           APK="${{ steps.apk.outputs.apk }}"
           ALIGNED="${APK%.apk}-aligned.apk"
           SIGNED="${APK%.apk}-signed.apk"
+          KEYSTORE="$RUNNER_TEMP/jepong-signing.jks"
 
-          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" \
+            -maxdepth 2 \
+            -type f \
+            -name zipalign \
+            | sort -V \
+            | tail -n 1)"
 
-          ZIPALIGN="$ANDROID_HOME/build-tools/36.0.0/zipalign"
-          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" \
+            -maxdepth 2 \
+            -type f \
+            -name apksigner \
+            | sort -V \
+            | tail -n 1)"
 
-          test -x "$ZIPALIGN"
-          test -x "$APKSIGNER"
+          if [ ! -x "$ZIPALIGN" ] || [ ! -x "$APKSIGNER" ]; then
+            echo "::error::zipalign/apksigner not found"
+            exit 1
+          fi
 
-          "$ZIPALIGN"             -f             -p             4             "$APK"             "$ALIGNED"
+          if [ "${{ steps.signing.outputs.enabled }}" = "true" ]; then
 
-          "$APKSIGNER" sign             --ks "$KEYSTORE"             --ks-key-alias "$APK_KEY_ALIAS"             --ks-pass "pass:$APK_KEYSTORE_PASSWORD"             --key-pass "pass:$APK_KEY_PASSWORD"             --out "$SIGNED"             "$ALIGNED"
+            echo "Using private production signing key"
 
-          "$APKSIGNER" verify             --verbose             --print-certs             "$SIGNED"
+            if [ -z "${APK_KEYSTORE_BASE64:-}" ] || \
+               [ -z "${APK_KEYSTORE_PASSWORD:-}" ] || \
+               [ -z "${APK_KEY_ALIAS:-}" ] || \
+               [ -z "${APK_KEY_PASSWORD:-}" ]; then
+
+              echo "::error::APK Signer is ON but GitHub signing secrets are missing."
+              exit 1
+            fi
+
+            printf '%s' "$APK_KEYSTORE_BASE64" \
+              | base64 --decode \
+              > "$KEYSTORE"
+
+            STOREPASS="$APK_KEYSTORE_PASSWORD"
+            KEYPASS="$APK_KEY_PASSWORD"
+            ALIAS="$APK_KEY_ALIAS"
+
+          else
+
+            echo "APK Signer OFF: creating temporary installable test signature"
+
+            STOREPASS="jepong-test-2026"
+            KEYPASS="jepong-test-2026"
+            ALIAS="jepong-test"
+
+            keytool \
+              -genkeypair \
+              -noprompt \
+              -keystore "$KEYSTORE" \
+              -storepass "$STOREPASS" \
+              -keypass "$KEYPASS" \
+              -alias "$ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 3650 \
+              -dname "CN=Jepong Devxyz Test,O=Jepong Devxyz,C=PH"
+          fi
+
+          "$ZIPALIGN" \
+            -f \
+            -p \
+            4 \
+            "$APK" \
+            "$ALIGNED"
+
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$ALIAS" \
+            --ks-pass "pass:$STOREPASS" \
+            --key-pass "pass:$KEYPASS" \
+            --out "$SIGNED" \
+            "$ALIGNED"
+
+          echo "===== VERIFY APK SIGNATURE ====="
+
+          "$APKSIGNER" verify \
+            --verbose \
+            --print-certs \
+            "$SIGNED"
 
           mv "$SIGNED" "$APK"
-          rm -f "$ALIGNED" "$KEYSTORE"
 
-          echo "Signed APK:"
+          rm -f \
+            "$ALIGNED" \
+            "$KEYSTORE"
+
+          echo "===== FINAL INSTALLABLE APK ====="
           ls -lh "$APK"
 
       - name: Upload APK artifact
