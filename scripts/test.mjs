@@ -134,7 +134,7 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   ){
     if(!geckoMain.includes(token)){
       throw new Error(
-        \`gecko runtime feature missing: \${token}\`
+        `gecko runtime feature missing: ${token}`
       );
     }
   }
