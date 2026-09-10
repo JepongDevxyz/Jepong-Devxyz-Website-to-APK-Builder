@@ -27,7 +27,7 @@ const nativeControls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom
 const geckoExtensions=['adguard','ghostery','privacyBadger','darkReader','ublock'];
 const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:allPermissions,controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500,apkSigner:true};
 for(const engine of ['native','gecko','capacitor','cordova']){
-  const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav']:['transparentNav','pinchZoom'];
+  const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav','navigationToolbar','externalLinks','downloadManager']:['transparentNav','pinchZoom'];
   const extensions=engine==='gecko'?geckoExtensions:[];
   const sizeOptimization=engine==='gecko';
   const abiTarget=sizeOptimization?'arm64-v8a':'universal';
@@ -89,6 +89,30 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   }
 }
 
+/* Gecko Browser Controls UI assertions */
+{
+  const appText=
+    fs.readFileSync(
+      path.join(root,'app.js'),
+      'utf8'
+    );
+
+  for(
+    const token of [
+      'navigationToolbar',
+      'externalLinks',
+      'downloadManager'
+    ]
+  ){
+    if(!appText.includes(token)){
+      throw new Error(
+        `builder control missing: ${token}`
+      );
+    }
+  }
+}
+
+
 /* Gecko runtime diagnostics assertions */
 {
   const geckoMain=
@@ -125,7 +149,24 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     'jepong_extensions',
     'extid_',
     'findInstalled',
-    'prepareExtensions'
+    'prepareExtensions',
+    'setNavigationDelegate',
+    'TARGET_WINDOW_NEW',
+    'buildNavigationToolbar',
+    'goForward()',
+    'reload()',
+    'Share page',
+    'shouldOpenExternally',
+    'setPromptDelegate',
+    'onFilePrompt',
+    'ACTION_OPEN_DOCUMENT',
+    'ACTION_OPEN_DOCUMENT_TREE',
+    'FILE_PICKER_REQUEST',
+    'setContentDelegate',
+    'onExternalResponse',
+    'DownloadManager',
+    'VISIBILITY_VISIBLE_NOTIFY_COMPLETED',
+    'enqueueDownload'
   ];
 
   for(

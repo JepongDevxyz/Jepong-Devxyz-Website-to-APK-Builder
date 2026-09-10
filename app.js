@@ -22,6 +22,9 @@ const CONTROLS=[
   ['pinchZoom','Pinch to zoom','Engine-specific'],
   ['disableCopy','Disable text copy','Native only'],
   ['blockAdsRedirects','Block ad redirects','Basic Native filter'],
+  ['navigationToolbar','Navigation toolbar','Back, forward, home, refresh and share'],
+  ['externalLinks','External link rules','Open user-clicked off-site links in Android'],
+  ['downloadManager','Download manager','Android system downloads for standard HTTP/HTTPS files'],
   ['adguardDns','AdGuard DNS','Requires VPN/DNS layer']
 ];
 
@@ -52,6 +55,9 @@ const OPTION_ICONS={
   pinchZoom:'zoom-in',
   disableCopy:'copy',
   blockAdsRedirects:'shield-off',
+  navigationToolbar:'navigation',
+  externalLinks:'external-link',
+  downloadManager:'download',
   adguardDns:'network',
 
   adguard:'shield',
@@ -116,6 +122,9 @@ const COMPAT={
       pinchZoom:0,
       disableCopy:0,
       blockAdsRedirects:0,
+      navigationToolbar:1,
+      externalLinks:1,
+      downloadManager:1,
       adguardDns:0
     },
     extensions:Object.fromEntries(EXTENSIONS.map(([k])=>[k,1]))

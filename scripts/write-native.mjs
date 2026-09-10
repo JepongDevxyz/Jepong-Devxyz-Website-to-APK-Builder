@@ -167,9 +167,32 @@ function geckoActivity(cfg) {
     urls.add("https://addons.mozilla.org/firefox/downloads/latest/${x.slug}/latest.xpi");
   `).join('\n');
 
+  const geckoControls=
+    cfg.controls||[];
+
   const transparent=
-    (cfg.controls||[])
-      .includes('transparentNav');
+    geckoControls.includes(
+      'transparentNav'
+    );
+
+  const navigationToolbar=
+    geckoControls.includes(
+      'navigationToolbar'
+    );
+
+  const externalLinks=
+    geckoControls.includes(
+      'externalLinks'
+    );
+
+  const downloadManager=
+    geckoControls.includes(
+      'downloadManager'
+    );
+
+  const filesEnabled=
+    (cfg.permissions||[])
+      .includes('files');
 
   const hard=
     cfg.renderMode==='hardware';
@@ -183,6 +206,9 @@ import android.graphics.Color;
 import android.view.*;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.app.DownloadManager;
+import android.webkit.URLUtil;
 import android.widget.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -192,13 +218,40 @@ public class MainActivity extends Activity {
 
   final String HOME=${javaString(cfg.websiteUrl)};
 
+  final boolean NAVIGATION_TOOLBAR=${navigationToolbar};
+  final boolean EXTERNAL_LINKS=${externalLinks};
+  final boolean DOWNLOAD_MANAGER=${downloadManager};
+  final boolean FILES_ENABLED=${filesEnabled};
+
+  static final int FILE_PICKER_REQUEST=902;
+
   GeckoRuntime runtime;
   GeckoSession session;
   GeckoView view;
 
   FrameLayout root;
+  LinearLayout browserShell;
+  LinearLayout navigationBar;
   LinearLayout loader;
   LinearLayout diagnostics;
+
+  Button backButton;
+  Button forwardButton;
+  Button homeButton;
+  Button refreshButton;
+  Button shareButton;
+
+  boolean canGoBack=false;
+  boolean canGoForward=false;
+
+  String currentUrl=HOME;
+
+  GeckoResult<
+    GeckoSession.PromptDelegate.PromptResponse
+  > pendingFileResult;
+
+  GeckoSession.PromptDelegate.FilePrompt
+    pendingFilePrompt;
 
   ProgressBar loadingBar;
   TextView loadingStatus;
@@ -351,6 +404,220 @@ public class MainActivity extends Activity {
     session=
       new GeckoSession();
 
+    session.setNavigationDelegate(
+      new GeckoSession.NavigationDelegate(){
+
+        @Override
+        public void onCanGoBack(
+          GeckoSession currentSession,
+          boolean value
+        ){
+          canGoBack=value;
+          updateNavigationButtons();
+        }
+
+        @Override
+        public void onCanGoForward(
+          GeckoSession currentSession,
+          boolean value
+        ){
+          canGoForward=value;
+          updateNavigationButtons();
+        }
+
+        @Override
+        public GeckoResult<AllowOrDeny>
+        onLoadRequest(
+          GeckoSession currentSession,
+          LoadRequest request
+        ){
+          if(
+            request.target==
+              GeckoSession.NavigationDelegate
+                .TARGET_WINDOW_NEW
+          ){
+            if(
+              EXTERNAL_LINKS &&
+              shouldOpenExternally(
+                request.uri
+              )
+            ){
+              openExternalUrl(
+                request.uri
+              );
+            }else{
+              currentSession.loadUri(
+                request.uri
+              );
+            }
+
+            return GeckoResult.deny();
+          }
+
+          if(
+            EXTERNAL_LINKS &&
+            request.hasUserGesture &&
+            shouldOpenExternally(
+              request.uri
+            )
+          ){
+            openExternalUrl(
+              request.uri
+            );
+
+            return GeckoResult.deny();
+          }
+
+          return GeckoResult.allow();
+        }
+      }
+    );
+
+    session.setPromptDelegate(
+      new GeckoSession.PromptDelegate(){
+
+        @Override
+        public GeckoResult<
+          GeckoSession.PromptDelegate.PromptResponse
+        > onFilePrompt(
+          GeckoSession currentSession,
+          GeckoSession.PromptDelegate.FilePrompt prompt
+        ){
+          if(!FILES_ENABLED){
+            return GeckoResult.fromValue(
+              prompt.dismiss()
+            );
+          }
+
+          if(
+            pendingFileResult!=null &&
+            pendingFilePrompt!=null
+          ){
+            try{
+              pendingFileResult.complete(
+                pendingFilePrompt.dismiss()
+              );
+            }catch(Exception ignored){}
+
+            pendingFileResult=null;
+            pendingFilePrompt=null;
+          }
+
+          Intent intent;
+
+          if(
+            prompt.type==
+              GeckoSession.PromptDelegate
+                .FilePrompt.Type.FOLDER
+          ){
+            intent=new Intent(
+              Intent.ACTION_OPEN_DOCUMENT_TREE
+            );
+          }else{
+            intent=new Intent(
+              Intent.ACTION_OPEN_DOCUMENT
+            );
+
+            intent.addCategory(
+              Intent.CATEGORY_OPENABLE
+            );
+
+            if(
+              prompt.mimeTypes!=null &&
+              prompt.mimeTypes.length==1
+            ){
+              intent.setType(
+                prompt.mimeTypes[0]
+              );
+            }else{
+              intent.setType("*/*");
+
+              if(
+                prompt.mimeTypes!=null &&
+                prompt.mimeTypes.length>1
+              ){
+                intent.putExtra(
+                  Intent.EXTRA_MIME_TYPES,
+                  prompt.mimeTypes
+                );
+              }
+            }
+
+            intent.putExtra(
+              Intent.EXTRA_ALLOW_MULTIPLE,
+              prompt.type==
+                GeckoSession.PromptDelegate
+                  .FilePrompt.Type.MULTIPLE
+            );
+          }
+
+          intent.addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION
+          );
+
+          final GeckoResult<
+            GeckoSession.PromptDelegate.PromptResponse
+          > result=new GeckoResult<>();
+
+          pendingFileResult=result;
+          pendingFilePrompt=prompt;
+
+          try{
+            startActivityForResult(
+              intent,
+              FILE_PICKER_REQUEST
+            );
+          }catch(Exception error){
+            pendingFileResult=null;
+            pendingFilePrompt=null;
+
+            return GeckoResult.fromValue(
+              prompt.dismiss()
+            );
+          }
+
+          return result;
+        }
+      }
+    );
+
+    session.setContentDelegate(
+      new GeckoSession.ContentDelegate(){
+
+        @Override
+        public void onExternalResponse(
+          GeckoSession currentSession,
+          WebResponse response
+        ){
+          if(response==null){
+            return;
+          }
+
+          if(response.requestExternalApp){
+            closeResponseBody(response);
+            openExternalUrl(response.uri);
+            return;
+          }
+
+          if(DOWNLOAD_MANAGER){
+            enqueueDownload(response);
+          }else{
+            closeResponseBody(response);
+            openExternalUrl(response.uri);
+          }
+        }
+
+        @Override
+        public void onCrash(
+          GeckoSession currentSession
+        ){
+          showWebsiteError(
+            "Browser process stopped. Tap Retry."
+          );
+        }
+      }
+    );
+
     session.setPermissionDelegate(
       new GeckoSession.PermissionDelegate(){
 
@@ -429,6 +696,11 @@ public class MainActivity extends Activity {
           GeckoSession currentSession,
           String url
         ){
+          currentUrl=
+            url!=null
+              ? url
+              : HOME;
+
           beginWebsiteTimeout();
 
           setWebsiteProgress(0);
@@ -479,8 +751,36 @@ public class MainActivity extends Activity {
       ? 'view.setLayerType(View.LAYER_TYPE_HARDWARE,null);'
       : ''}
 
-    root.addView(
+    browserShell=
+      new LinearLayout(this);
+
+    browserShell.setOrientation(
+      LinearLayout.VERTICAL
+    );
+
+    browserShell.addView(
       view,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+      )
+    );
+
+    if(NAVIGATION_TOOLBAR){
+      buildNavigationToolbar();
+
+      browserShell.addView(
+        navigationBar,
+        new LinearLayout.LayoutParams(
+          LinearLayout.LayoutParams.MATCH_PARENT,
+          dp(54)
+        )
+      );
+    }
+
+    root.addView(
+      browserShell,
       new FrameLayout.LayoutParams(
         FrameLayout.LayoutParams.MATCH_PARENT,
         FrameLayout.LayoutParams.MATCH_PARENT
@@ -718,6 +1018,468 @@ public class MainActivity extends Activity {
     );
 
     setContentView(root);
+  }
+
+  Button makeNavigationButton(
+    String text,
+    String description
+  ){
+    Button button=
+      new Button(this);
+
+    button.setText(text);
+    button.setTextSize(18f);
+    button.setAllCaps(false);
+    button.setContentDescription(
+      description
+    );
+    button.setMinWidth(0);
+    button.setMinimumWidth(0);
+
+    return button;
+  }
+
+  void buildNavigationToolbar(){
+    navigationBar=
+      new LinearLayout(this);
+
+    navigationBar.setOrientation(
+      LinearLayout.HORIZONTAL
+    );
+
+    navigationBar.setGravity(
+      Gravity.CENTER
+    );
+
+    navigationBar.setPadding(
+      dp(4),
+      dp(2),
+      dp(4),
+      dp(2)
+    );
+
+    navigationBar.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    backButton=
+      makeNavigationButton(
+        "‹",
+        "Back"
+      );
+
+    forwardButton=
+      makeNavigationButton(
+        "›",
+        "Forward"
+      );
+
+    homeButton=
+      makeNavigationButton(
+        "⌂",
+        "Home"
+      );
+
+    refreshButton=
+      makeNavigationButton(
+        "↻",
+        "Refresh"
+      );
+
+    shareButton=
+      makeNavigationButton(
+        "↗",
+        "Share"
+      );
+
+    LinearLayout.LayoutParams item=
+      new LinearLayout.LayoutParams(
+        0,
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        1f
+      );
+
+    navigationBar.addView(
+      backButton,
+      new LinearLayout.LayoutParams(item)
+    );
+
+    navigationBar.addView(
+      forwardButton,
+      new LinearLayout.LayoutParams(item)
+    );
+
+    navigationBar.addView(
+      homeButton,
+      new LinearLayout.LayoutParams(item)
+    );
+
+    navigationBar.addView(
+      refreshButton,
+      new LinearLayout.LayoutParams(item)
+    );
+
+    navigationBar.addView(
+      shareButton,
+      new LinearLayout.LayoutParams(item)
+    );
+
+    backButton.setOnClickListener(
+      clicked->{
+        if(
+          session!=null &&
+          canGoBack
+        ){
+          session.goBack();
+        }
+      }
+    );
+
+    forwardButton.setOnClickListener(
+      clicked->{
+        if(
+          session!=null &&
+          canGoForward
+        ){
+          session.goForward();
+        }
+      }
+    );
+
+    homeButton.setOnClickListener(
+      clicked->{
+        if(session!=null){
+          session.loadUri(HOME);
+        }
+      }
+    );
+
+    refreshButton.setOnClickListener(
+      clicked->{
+        if(session!=null){
+          session.reload();
+        }
+      }
+    );
+
+    shareButton.setOnClickListener(
+      clicked->shareCurrentPage()
+    );
+
+    updateNavigationButtons();
+  }
+
+  void updateNavigationButtons(){
+    runOnUiThread(()->{
+      if(backButton!=null){
+        backButton.setEnabled(
+          canGoBack
+        );
+
+        backButton.setAlpha(
+          canGoBack
+            ? 1f
+            : 0.35f
+        );
+      }
+
+      if(forwardButton!=null){
+        forwardButton.setEnabled(
+          canGoForward
+        );
+
+        forwardButton.setAlpha(
+          canGoForward
+            ? 1f
+            : 0.35f
+        );
+      }
+    });
+  }
+
+  void shareCurrentPage(){
+    try{
+      Intent share=
+        new Intent(
+          Intent.ACTION_SEND
+        );
+
+      share.setType(
+        "text/plain"
+      );
+
+      share.putExtra(
+        Intent.EXTRA_TEXT,
+        currentUrl!=null
+          ? currentUrl
+          : HOME
+      );
+
+      startActivity(
+        Intent.createChooser(
+          share,
+          "Share page"
+        )
+      );
+    }catch(Exception error){
+      Toast.makeText(
+        this,
+        "Unable to share this page",
+        Toast.LENGTH_SHORT
+      ).show();
+    }
+  }
+
+  boolean shouldOpenExternally(
+    String url
+  ){
+    if(url==null){
+      return false;
+    }
+
+    try{
+      Uri target=
+        Uri.parse(url);
+
+      String scheme=
+        target.getScheme();
+
+      if(scheme==null){
+        return false;
+      }
+
+      scheme=
+        scheme.toLowerCase(
+          Locale.ROOT
+        );
+
+      if(
+        scheme.equals("tel") ||
+        scheme.equals("mailto") ||
+        scheme.equals("sms") ||
+        scheme.equals("geo") ||
+        scheme.equals("market")
+      ){
+        return true;
+      }
+
+      if(
+        !scheme.equals("http") &&
+        !scheme.equals("https")
+      ){
+        return false;
+      }
+
+      Uri home=
+        Uri.parse(HOME);
+
+      String homeHost=
+        home.getHost();
+
+      String targetHost=
+        target.getHost();
+
+      if(
+        homeHost==null ||
+        targetHost==null
+      ){
+        return false;
+      }
+
+      homeHost=
+        homeHost.toLowerCase(
+          Locale.ROOT
+        );
+
+      targetHost=
+        targetHost.toLowerCase(
+          Locale.ROOT
+        );
+
+      if(
+        targetHost.equals(homeHost) ||
+        targetHost.endsWith(
+          "."+homeHost
+        ) ||
+        homeHost.endsWith(
+          "."+targetHost
+        )
+      ){
+        return false;
+      }
+
+      return true;
+
+    }catch(Exception error){
+      return false;
+    }
+  }
+
+  void openExternalUrl(
+    String url
+  ){
+    if(url==null){
+      return;
+    }
+
+    try{
+      Intent intent=
+        new Intent(
+          Intent.ACTION_VIEW,
+          Uri.parse(url)
+        );
+
+      startActivity(intent);
+
+    }catch(Exception error){
+      Toast.makeText(
+        this,
+        "No app can open this link",
+        Toast.LENGTH_SHORT
+      ).show();
+    }
+  }
+
+  void closeResponseBody(
+    WebResponse response
+  ){
+    try{
+      if(
+        response!=null &&
+        response.body!=null
+      ){
+        response.body.close();
+      }
+    }catch(Exception ignored){}
+  }
+
+  void enqueueDownload(
+    WebResponse response
+  ){
+    if(
+      response==null ||
+      response.uri==null
+    ){
+      closeResponseBody(response);
+      return;
+    }
+
+    try{
+      Uri uri=
+        Uri.parse(
+          response.uri
+        );
+
+      String scheme=
+        uri.getScheme();
+
+      if(
+        scheme==null ||
+        (
+          !scheme.equalsIgnoreCase("http") &&
+          !scheme.equalsIgnoreCase("https")
+        )
+      ){
+        closeResponseBody(response);
+        openExternalUrl(response.uri);
+        return;
+      }
+
+      String disposition=
+        response.headers.get(
+          "content-disposition"
+        );
+
+      String mime=
+        response.headers.get(
+          "content-type"
+        );
+
+      String fileName=
+        URLUtil.guessFileName(
+          response.uri,
+          disposition,
+          mime
+        );
+
+      DownloadManager.Request request=
+        new DownloadManager.Request(
+          uri
+        );
+
+      request.setTitle(
+        fileName
+      );
+
+      request.setDescription(
+        "Downloading..."
+      );
+
+      if(mime!=null){
+        request.setMimeType(
+          mime
+        );
+      }
+
+      request.setNotificationVisibility(
+        DownloadManager.Request
+          .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+      );
+
+      try{
+        if(Build.VERSION.SDK_INT>=29){
+          request.setDestinationInExternalPublicDir(
+            Environment.DIRECTORY_DOWNLOADS,
+            fileName
+          );
+        }else{
+          request.setDestinationInExternalFilesDir(
+            this,
+            Environment.DIRECTORY_DOWNLOADS,
+            fileName
+          );
+        }
+      }catch(Exception ignored){
+        request.setDestinationInExternalFilesDir(
+          this,
+          Environment.DIRECTORY_DOWNLOADS,
+          fileName
+        );
+      }
+
+      DownloadManager manager=
+        (DownloadManager)
+          getSystemService(
+            DOWNLOAD_SERVICE
+          );
+
+      if(manager==null){
+        throw new IllegalStateException(
+          "Download service unavailable"
+        );
+      }
+
+      manager.enqueue(request);
+
+      Toast.makeText(
+        this,
+        "Download started: "+fileName,
+        Toast.LENGTH_LONG
+      ).show();
+
+    }catch(Exception error){
+      Toast.makeText(
+        this,
+        "Download could not be started",
+        Toast.LENGTH_LONG
+      ).show();
+    }finally{
+      closeResponseBody(response);
+    }
   }
 
   void prepareExtensions(
@@ -1590,8 +2352,101 @@ public class MainActivity extends Activity {
   }
 
   @Override
+  protected void onActivityResult(
+    int requestCode,
+    int resultCode,
+    Intent data
+  ){
+    super.onActivityResult(
+      requestCode,
+      resultCode,
+      data
+    );
+
+    if(
+      requestCode!=FILE_PICKER_REQUEST ||
+      pendingFileResult==null ||
+      pendingFilePrompt==null
+    ){
+      return;
+    }
+
+    try{
+      if(
+        resultCode==RESULT_OK &&
+        data!=null
+      ){
+        ArrayList<Uri> picked=
+          new ArrayList<>();
+
+        ClipData clip=
+          data.getClipData();
+
+        if(clip!=null){
+          for(
+            int i=0;
+            i<clip.getItemCount();
+            i++
+          ){
+            Uri uri=
+              clip.getItemAt(i)
+                .getUri();
+
+            if(uri!=null){
+              picked.add(uri);
+            }
+          }
+        }else if(
+          data.getData()!=null
+        ){
+          picked.add(
+            data.getData()
+          );
+        }
+
+        if(!picked.isEmpty()){
+          Uri[] uris=
+            picked.toArray(
+              new Uri[0]
+            );
+
+          pendingFileResult.complete(
+            pendingFilePrompt.confirm(
+              getApplicationContext(),
+              uris
+            )
+          );
+        }else{
+          pendingFileResult.complete(
+            pendingFilePrompt.dismiss()
+          );
+        }
+
+      }else{
+        pendingFileResult.complete(
+          pendingFilePrompt.dismiss()
+        );
+      }
+
+    }catch(Exception error){
+      try{
+        pendingFileResult.complete(
+          pendingFilePrompt.dismiss()
+        );
+      }catch(Exception ignored){}
+
+    }finally{
+      pendingFileResult=null;
+      pendingFilePrompt=null;
+    }
+  }
+
+  @Override
   public void onBackPressed(){
-    if(session!=null){
+    if(
+      session!=null &&
+      canGoBack
+    ){
       session.goBack();
     }else{
       super.onBackPressed();
