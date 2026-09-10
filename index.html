@@ -7,6 +7,7 @@
   <meta name="description" content="Jepong Devxyz Website to APK Builder" />
   <title>Jepong Devxyz · Website to APK Builder</title>
   <link rel="stylesheet" href="/styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <div class="aurora one"></div>
@@ -23,9 +24,9 @@
 
     <div class="top-actions">
       <span class="status"><i></i> Builder ready</span>
-      <button class="icon-btn" id="presetsBtn" title="Presets">☆</button>
-      <button class="icon-btn" id="historyBtn" title="History">↺</button>
-      <button class="icon-btn" id="themeBtn" title="Theme">◐</button>
+      <button class="icon-btn" id="presetsBtn" title="Presets" aria-label="Presets"><i data-lucide="bookmark"></i></button>
+      <button class="icon-btn" id="historyBtn" title="History" aria-label="History"><i data-lucide="history"></i></button>
+      <button class="icon-btn" id="themeBtn" title="Theme" aria-label="Theme"><i data-lucide="sun-moon"></i></button>
     </div>
   </header>
 
@@ -60,33 +61,71 @@
           </div>
 
           <div class="engine-grid" id="engineGrid">
+
             <label class="engine active" data-engine="native">
               <input type="radio" name="engine" value="native" checked>
-              <b>Native WebView</b>
-              <small>Small APK · widest controls</small>
-              <i>Recommended</i>
+
+              <span class="engine-icon">
+                <i data-lucide="smartphone"></i>
+              </span>
+
+              <span class="engine-copy">
+                <b>Native WebView</b>
+                <small>Small APK · widest controls</small>
+                <em>Recommended</em>
+              </span>
+
+              <span class="ios-choice" aria-hidden="true"></span>
             </label>
 
             <label class="engine" data-engine="gecko">
               <input type="radio" name="engine" value="gecko">
-              <b>GeckoView</b>
-              <small>Mozilla engine · extensions</small>
-              <i>Extensions</i>
+
+              <span class="engine-icon">
+                <i data-lucide="globe-2"></i>
+              </span>
+
+              <span class="engine-copy">
+                <b>GeckoView</b>
+                <small>Mozilla engine · extensions</small>
+                <em>Extensions</em>
+              </span>
+
+              <span class="ios-choice" aria-hidden="true"></span>
             </label>
 
             <label class="engine" data-engine="capacitor">
               <input type="radio" name="engine" value="capacitor">
-              <b>Capacitor</b>
-              <small>Modern Android bridge</small>
-              <i>Modern</i>
+
+              <span class="engine-icon">
+                <i data-lucide="boxes"></i>
+              </span>
+
+              <span class="engine-copy">
+                <b>Capacitor</b>
+                <small>Modern Android bridge</small>
+                <em>Modern</em>
+              </span>
+
+              <span class="ios-choice" aria-hidden="true"></span>
             </label>
 
             <label class="engine" data-engine="cordova">
               <input type="radio" name="engine" value="cordova">
-              <b>Cordova</b>
-              <small>Classic hybrid stack</small>
-              <i>Stable</i>
+
+              <span class="engine-icon">
+                <i data-lucide="layers-3"></i>
+              </span>
+
+              <span class="engine-copy">
+                <b>Cordova</b>
+                <small>Classic hybrid stack</small>
+                <em>Stable</em>
+              </span>
+
+              <span class="ios-choice" aria-hidden="true"></span>
             </label>
+
           </div>
 
           <input id="engine" type="hidden" value="native">
@@ -101,7 +140,10 @@
               <p>Website and Android package information.</p>
             </div>
 
-            <button class="link-btn" id="savePresetBtn">Save preset</button>
+            <button class="link-btn icon-text-btn" id="savePresetBtn">
+              <i data-lucide="bookmark-plus"></i>
+              <span>Save preset</span>
+            </button>
           </div>
 
           <div class="form-grid">
@@ -162,15 +204,21 @@
 
           <div class="tabs">
             <button class="tab active" data-tab="permissions">
-              Permissions <b id="permissionCount">0</b>
+              <i data-lucide="shield-check"></i>
+              <span>Permissions</span>
+              <b id="permissionCount">0</b>
             </button>
 
             <button class="tab" data-tab="controls">
-              Website Controls <b id="controlCount">0</b>
+              <i data-lucide="sliders-horizontal"></i>
+              <span>Website Controls</span>
+              <b id="controlCount">0</b>
             </button>
 
             <button class="tab" data-tab="extensions">
-              Extensions <b id="extensionCount">0</b>
+              <i data-lucide="puzzle"></i>
+              <span>Extensions</span>
+              <b id="extensionCount">0</b>
             </button>
           </div>
 
@@ -295,7 +343,7 @@
 
         <section class="card build-card" id="buildSection">
           <div id="buildReady">
-            <span class="build-icon">⌘</span>
+            <span class="build-icon"><i data-lucide="package-plus"></i></span>
             <h2>Ready to build</h2>
             <p>
               Your configuration will be sent to the verified GitHub Actions pipeline.
@@ -309,7 +357,10 @@
                 <small id="buildSubtitle">GitHub Actions</small>
               </div>
 
-              <button class="link-btn" id="logsBtn">Logs</button>
+              <button class="link-btn icon-text-btn" id="logsBtn">
+                <i data-lucide="terminal"></i>
+                <span>Logs</span>
+              </button>
             </div>
 
             <div class="progress">
@@ -325,7 +376,7 @@
           </section>
 
           <section id="successCard" class="success hidden">
-            <span>✓</span>
+            <span class="success-icon"><i data-lucide="circle-check-big"></i></span>
             <div>
               <b>APK build successful</b>
               <small>Your APK artifact is ready.</small>
@@ -333,12 +384,14 @@
             <a id="downloadBtn" class="download" href="#" download>Download APK</a>
           </section>
 
-          <button class="primary" id="buildBtn">
-            Generate & Build APK
+          <button class="primary icon-action" id="buildBtn">
+            <i data-lucide="hammer"></i>
+            <span>Generate & Build APK</span>
           </button>
 
-          <button class="secondary" id="resetBtn">
-            Reset form
+          <button class="secondary icon-action" id="resetBtn">
+            <i data-lucide="rotate-ccw"></i>
+            <span>Reset form</span>
           </button>
         </section>
       </aside>
@@ -353,7 +406,7 @@
         <b>Build history</b>
         <small>Stored in this browser</small>
       </div>
-      <button class="icon-btn" data-close-drawer>×</button>
+      <button class="icon-btn" data-close-drawer aria-label="Close"><i data-lucide="x"></i></button>
     </div>
 
     <div id="historyList"></div>
@@ -365,7 +418,7 @@
         <b>Saved presets</b>
         <small>Stored locally in this browser.</small>
       </div>
-      <button class="icon-btn" id="closePresets">×</button>
+      <button class="icon-btn" id="closePresets" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
 
     <div id="presetList"></div>
@@ -379,8 +432,11 @@
       </div>
 
       <div>
-        <button class="link-btn" id="refreshLogs">Refresh</button>
-        <button class="icon-btn" id="closeLogs">×</button>
+        <button class="link-btn icon-text-btn" id="refreshLogs">
+          <i data-lucide="refresh-cw"></i>
+          <span>Refresh</span>
+        </button>
+        <button class="icon-btn" id="closeLogs" aria-label="Close"><i data-lucide="x"></i></button>
       </div>
     </div>
 

@@ -33,6 +33,44 @@ const EXTENSIONS=[
   ['ublock','uBlock Origin','GeckoView']
 ];
 
+const OPTION_ICONS={
+  camera:'camera',
+  microphone:'mic',
+  notification:'bell',
+  location:'map-pin',
+  media:'image',
+  contacts:'users',
+  calendar:'calendar',
+  biometrics:'fingerprint',
+  files:'folder',
+  bluetooth:'bluetooth',
+  sensors:'activity',
+
+  pullRefresh:'refresh-cw',
+  hideScrollbars:'eye-off',
+  transparentNav:'square',
+  pinchZoom:'zoom-in',
+  disableCopy:'copy',
+  blockAdsRedirects:'shield-off',
+  adguardDns:'network',
+
+  adguard:'shield',
+  ghostery:'ghost',
+  privacyBadger:'lock-keyhole',
+  darkReader:'moon',
+  ublock:'circle-slash'
+};
+
+function refreshIcons(){
+  requestAnimationFrame(()=>{
+    window.lucide?.createIcons({
+      attrs:{
+        'stroke-width':2
+      }
+    });
+  });
+}
+
 const META={
   native:{
     name:'Native WebView',
@@ -130,24 +168,36 @@ const themeKey='jepong-apk-theme';
 function renderOptions(list,host,group){
   host.innerHTML=list.map(([id,label,desc])=>`
     <label
-      class="toggle"
+      class="toggle option-toggle"
       data-option="${id}"
       data-desc="${desc}">
+
       <input
+        class="ios-input"
         type="checkbox"
         value="${id}"
         data-group="${group}">
-      <span>
+
+      <span class="option-icon" aria-hidden="true">
+        <i data-lucide="${OPTION_ICONS[id] || 'circle'}"></i>
+      </span>
+
+      <span class="option-copy">
         <b>${label}</b>
         <small class="support">${desc}</small>
       </span>
+
+      <span class="ios-toggle" aria-hidden="true"></span>
     </label>
   `).join('');
+
+  refreshIcons();
 }
 
 renderOptions(PERMISSIONS,$('#permissionsList'),'permissions');
 renderOptions(CONTROLS,$('#controlsList'),'controls');
 renderOptions(EXTENSIONS,$('#extensionsList'),'extensions');
+refreshIcons();
 
 function setEngine(engine){
   $('#engine').value=engine;
@@ -204,6 +254,7 @@ function updateCompat(){
   $('#compatNote').textContent=META[eng].note;
 
   updateCount();
+  refreshIcons();
 }
 
 function updateCount(){
@@ -775,6 +826,7 @@ function renderHistory(){
 }
 
 renderHistory();
+refreshIcons();
 
 function openDrawer(){
   $('#historyDrawer')
