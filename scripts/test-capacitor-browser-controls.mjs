@@ -152,6 +152,11 @@ fs.writeFileSync(
   ),
   `android {
   namespace 'com.jepongdevxyz.capcontrols'
+
+  defaultConfig {
+    versionCode 1
+    versionName "1.0"
+  }
 }
 dependencies {
   implementation 'example:dep:1'

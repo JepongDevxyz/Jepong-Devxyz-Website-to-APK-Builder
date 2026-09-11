@@ -567,7 +567,7 @@ function fakePlatform(dir,engine){
   const ar=engine==='capacitor'?path.join(dir,'android'):path.join(dir,'platforms/android');
   const app=path.join(ar,'app'); fs.mkdirSync(path.join(app,'src/main/java/com/jepongdevxyz/app'),{recursive:true}); fs.mkdirSync(path.join(app,'src/main/res/values'),{recursive:true});
   fs.writeFileSync(path.join(app,'src/main/AndroidManifest.xml'),`<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:icon="@mipmap/ic_launcher"><activity android:name=".MainActivity" android:exported="true"/></application><uses-permission android:name="android.permission.INTERNET"/></manifest>`);
-  fs.writeFileSync(path.join(app,'build.gradle'),`android { namespace 'com.jepongdevxyz.app' }\ndependencies {\n implementation 'example:dep:1'\n}\n`);
+  fs.writeFileSync(path.join(app,'build.gradle'),`android {\n namespace 'com.jepongdevxyz.app'\n defaultConfig {\n  versionCode 1\n  versionName "1.0"\n }\n}\ndependencies {\n implementation 'example:dep:1'\n}\n`);
   fs.writeFileSync(path.join(app,'src/main/res/values/styles.xml'),'<resources><style name="AppTheme.NoActionBarLaunch"></style></resources>');
   fs.writeFileSync(path.join(app,'src/main/java/com/jepongdevxyz/app/MainActivity.java'),'package com.jepongdevxyz.app; public class MainActivity {}');
 }

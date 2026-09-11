@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig, workDir, brandedAsset, mkdir, write, javaString } from './common.mjs';
+import { patchAndroidVersionMetadata } from './android-version-metadata.mjs';
 
 const args=process.argv.slice(2);
 const value=k=>{const i=args.indexOf(k); return i>=0?args[i+1]:''};
@@ -13,6 +14,8 @@ const androidRoot=engine==='capacitor'?path.join(project,'android'):path.join(pr
 const appRoot=path.join(androidRoot,'app');
 const manifestPath=path.join(appRoot,'src/main/AndroidManifest.xml');
 if(!fs.existsSync(manifestPath)) throw new Error(`Android platform not generated: ${manifestPath}`);
+
+if(engine==='capacitor') patchAndroidVersionMetadata(appRoot,cfg);
 
 const permissionMap={
  camera:['android.permission.CAMERA'], microphone:['android.permission.RECORD_AUDIO'], notification:['android.permission.POST_NOTIFICATIONS'],
