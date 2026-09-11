@@ -90,3 +90,18 @@ for(const id of ['camera','microphone','location','files']){
     reason:'Native generator/runtime-source regression and representative signed APK build passed; emulator launch and physical-device smoke evidence are still required'
   });
 }
+
+for(const id of [
+  'pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy',
+  'blockAdsRedirects','navigationToolbar','externalLinks','downloadManager'
+]){
+  Object.assign(CAPABILITY_EVIDENCE.native.controls[id],{
+    generator:true,
+    build:false,
+    emulator:false,
+    physical:false,
+    emulatorRequired:true,
+    physicalRequired:false,
+    reason:'Native generated behavior assertions passed; representative APK build and emulator runtime smoke are still required'
+  });
+}
