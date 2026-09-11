@@ -38,7 +38,7 @@ const required=[
   '--print-certs',
   'dump badging',
 
-  'Signer #1 certificate SHA-256 digest',
+  'certificate SHA-256 digest:[[:space:]]*',
 
   'f5e197d89410cb681acc9cd803f277e06c05ac2fa843adb9603fc3b4fdb1c3a2',
 
@@ -60,12 +60,7 @@ for(const token of required){
 }
 
 /*
-  Support both:
-    apkSigner: true
-
-  and:
-    apkSigner:
-      true
+  apkSigner may be formatted across multiple lines.
 */
 if(
   !/apkSigner:\s*true/.test(text)
@@ -76,8 +71,32 @@ if(
 }
 
 /*
-  Batch 6 must NEVER silently replace the existing
-  production signer with a generated test key.
+  Do not regress back to a particular apksigner
+  presentation such as "Signer #1".
+*/
+if(
+  text.includes(
+    "s/^Signer #1 certificate SHA-256 digest: //p"
+  )
+){
+  throw new Error(
+    'signed APK gate uses brittle Signer #1 certificate parser'
+  );
+}
+
+if(
+  !text.includes(
+    "s/^.*certificate SHA-256 digest:[[:space:]]*//p"
+  )
+){
+  throw new Error(
+    'signed APK gate lacks version-agnostic certificate parser'
+  );
+}
+
+/*
+  Batch 6 must NEVER create or silently substitute
+  another signing key.
 */
 for(const forbidden of [
   'keytool -genkeypair',
@@ -92,7 +111,7 @@ for(const forbidden of [
 }
 
 /*
-  Must build and patch all four actual engine types.
+  All four actual engines must be represented.
 */
 for(const token of [
   'ENGINE" = "native"',
@@ -101,6 +120,7 @@ for(const token of [
   'ENGINE" = "cordova"',
 
   'npx cap add android',
+
   'npx cordova',
   'android@15.1.0',
 
@@ -114,6 +134,60 @@ for(const token of [
       `signed gate engine build missing: ${token}`
     );
   }
+}
+
+/*
+  Capacitor has a Gradle wrapper.
+  Cordova Android 15.1.0 in this generated project
+  is built by the provisioned system Gradle command.
+*/
+const cordovaStart=
+  text.indexOf(
+    '- name: Build Cordova release APK'
+  );
+
+const cordovaEnd=
+  text.indexOf(
+    '# LOCATE GENERATED APK',
+    cordovaStart
+  );
+
+if(
+  cordovaStart<0 ||
+  cordovaEnd<0
+){
+  throw new Error(
+    'Cordova signed build block missing'
+  );
+}
+
+const cordovaBlock=
+  text.slice(
+    cordovaStart,
+    cordovaEnd
+  );
+
+if(
+  cordovaBlock.includes(
+    'chmod +x gradlew'
+  ) ||
+  cordovaBlock.includes(
+    './gradlew'
+  )
+){
+  throw new Error(
+    'Cordova signed build incorrectly assumes gradlew'
+  );
+}
+
+if(
+  !cordovaBlock.includes(
+    'gradle'
+  )
+){
+  throw new Error(
+    'Cordova signed build missing system Gradle'
+  );
 }
 
 console.log(

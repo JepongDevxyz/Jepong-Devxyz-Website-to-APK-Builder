@@ -376,9 +376,7 @@ jobs:
 
             cd "work/$BUILD_ID/project/platforms/android"
 
-            chmod +x gradlew
-
-            ./gradlew \
+            gradle \
               --no-daemon \
               assembleRelease \
               --stacktrace
@@ -586,7 +584,7 @@ jobs:
           CERT_SHA256="$(
             printf '%s\n' "$SIGNER_OUTPUT" |
             sed -n \
-              's/^Signer #1 certificate SHA-256 digest: //p' |
+              's/^.*certificate SHA-256 digest:[[:space:]]*//p' |
             head -n 1 |
             tr '[:upper:]' '[:lower:]' |
             tr -d ':[:space:]'
