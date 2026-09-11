@@ -1,0 +1,954 @@
+name: Build Batch 7 Runtime APKs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/batch7-runtime-apks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-signed:
+
+    name: Runtime ${{ matrix.engine }}
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        engine: [native, gecko, capacitor, cordova]
+
+    env:
+      ENGINE: ${{ matrix.engine }}
+
+      BUILD_ID: batch7-runtime-${{ matrix.engine }}
+
+      EXPECTED_SIGNER_SHA256: f5e197d89410cb681acc9cd803f277e06c05ac2fa843adb9603fc3b4fdb1c3a2
+
+    steps:
+
+      - name: Checkout builder
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21 for Capacitor
+        if: matrix.engine == 'capacitor'
+
+        uses: actions/setup-java@v5
+
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Java 17
+        if: matrix.engine != 'capacitor'
+
+        uses: actions/setup-java@v5
+
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          yes | sdkmanager --licenses >/dev/null || true
+
+          if [ "$ENGINE" = "gecko" ]; then
+
+            sdkmanager \
+              "platform-tools" \
+              "platforms;android-37.1" \
+              "build-tools;37.0.0" \
+              "build-tools;36.0.0"
+
+          else
+
+            sdkmanager \
+              "platform-tools" \
+              "platforms;android-36" \
+              "build-tools;36.0.0"
+
+          fi
+
+      # ======================================================
+      # TRUTHFUL BUILD CONFIG
+      # ======================================================
+
+      - name: Create truthful signed build configuration
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          mkdir -p builds
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          import {
+            getSelectableFeatureIds
+          } from './capabilities.mjs';
+
+          const engine=
+            process.env.ENGINE;
+
+          if(
+            ![
+              'native',
+              'gecko',
+              'capacitor',
+              'cordova'
+            ].includes(engine)
+          ){
+            throw new Error(
+              `Invalid engine: ${engine}`
+            );
+          }
+
+          const packageName=
+            `com.jepongdevxyz.runtime${engine}`;
+
+          const config={
+
+            websiteUrl:
+              'https://whatpwacando.today/',
+
+            appName:
+              `Jepong Runtime ${engine}`,
+
+            packageName,
+
+            versionName:
+              '1.0.0',
+
+            versionCode:
+              1,
+
+            engine,
+
+            renderMode:
+              'default',
+
+            orientation:
+              'auto',
+
+            permissions:
+              getSelectableFeatureIds(
+                engine,
+                'permissions'
+              ),
+
+            controls:
+              getSelectableFeatureIds(
+                engine,
+                'controls'
+              ),
+
+            extensions:
+              getSelectableFeatureIds(
+                engine,
+                'extensions'
+              ),
+
+            oneSignalAppId:
+              '',
+
+            offlineFallback:
+              'Offline',
+
+            iconDataUrl:
+              '',
+
+            splashDataUrl:
+              '',
+
+            splashEnabled:
+              true,
+
+            splashDuration:
+              1500,
+
+            apkSigner:
+              true,
+
+            sizeOptimization:
+              engine==='gecko',
+
+            abiTarget:
+              engine==='gecko'
+                ? 'arm64-v8a'
+                : 'universal'
+          };
+
+          fs.writeFileSync(
+            `builds/${process.env.BUILD_ID}.json`,
+            JSON.stringify(
+              config,
+              null,
+              2
+            )
+          );
+
+          console.log(
+            JSON.stringify(
+              {
+                engine,
+
+                packageName,
+
+                permissions:
+                  config.permissions,
+
+                controls:
+                  config.controls,
+
+                extensions:
+                  config.extensions,
+
+                apkSigner:
+                  config.apkSigner
+              },
+              null,
+              2
+            )
+          );
+          NODE
+
+      - name: Validate build configuration
+
+        run: |
+          node scripts/build.mjs \
+            prepare \
+            --build-id "$BUILD_ID"
+
+      - name: Generate engine project
+
+        run: |
+          node scripts/build.mjs \
+            generate \
+            --build-id "$BUILD_ID"
+
+      # ======================================================
+      # NATIVE + GECKO
+      # ======================================================
+
+      - name: Setup Gradle 9.6 for Native/Gecko
+
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+
+        uses: gradle/actions/setup-gradle@v6
+
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build Native/Gecko release APK
+
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          if [ "$ENGINE" = "native" ] || \
+             [ "$ENGINE" = "gecko" ]; then
+
+            cd "work/$BUILD_ID/project"
+
+            gradle \
+              --no-daemon \
+              :app:assembleRelease \
+              --stacktrace
+
+          fi
+
+      # ======================================================
+      # CAPACITOR
+      # ======================================================
+
+      - name: Setup Gradle for Capacitor
+
+        if: matrix.engine == 'capacitor'
+
+        uses: gradle/actions/setup-gradle@v6
+
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Build Capacitor release APK
+
+        if: matrix.engine == 'capacitor'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          if [ "$ENGINE" = "capacitor" ]; then
+
+            cd "work/$BUILD_ID/project"
+
+            npm install \
+              --no-audit \
+              --no-fund
+
+            npx cap add android
+
+            cd "$GITHUB_WORKSPACE"
+
+            node scripts/patch-android-platform.mjs \
+              --build-id "$BUILD_ID" \
+              --engine capacitor
+
+            cd "work/$BUILD_ID/project/android"
+
+            chmod +x gradlew
+
+            ./gradlew \
+              --no-daemon \
+              assembleRelease \
+              --stacktrace
+
+          fi
+
+      # ======================================================
+      # CORDOVA
+      # ======================================================
+
+      - name: Setup Gradle for Cordova
+
+        if: matrix.engine == 'cordova'
+
+        uses: gradle/actions/setup-gradle@v6
+
+        with:
+          gradle-version: '8.14.2'
+
+      - name: Build Cordova release APK
+
+        if: matrix.engine == 'cordova'
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          if [ "$ENGINE" = "cordova" ]; then
+
+            cd "work/$BUILD_ID/project"
+
+            npm install \
+              --no-audit \
+              --no-fund
+
+            npx cordova \
+              platform add \
+              android@15.1.0
+
+            npx cordova \
+              prepare android
+
+            cd "$GITHUB_WORKSPACE"
+
+            node scripts/patch-android-platform.mjs \
+              --build-id "$BUILD_ID" \
+              --engine cordova
+
+            cd "work/$BUILD_ID/project/platforms/android"
+
+            gradle \
+              --no-daemon \
+              assembleRelease \
+              --stacktrace
+
+          fi
+
+      # ======================================================
+      # LOCATE GENERATED APK
+      # ======================================================
+
+      - name: Locate generated APK
+        id: apk
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          APK="$(
+            node scripts/build.mjs \
+              locate-apk \
+              --build-id "$BUILD_ID" |
+            tail -n 1
+          )"
+
+          if [ ! -f "$APK" ]; then
+            echo "::error::Generated APK was not found"
+            exit 1
+          fi
+
+          BYTES="$(
+            stat -c%s "$APK"
+          )"
+
+          if [ "$BYTES" -le 0 ]; then
+            echo "::error::Generated APK is empty"
+            exit 1
+          fi
+
+          echo "apk=$APK" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "raw_size=$BYTES" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "===== RAW RELEASE APK ====="
+
+          ls -lh "$APK"
+
+      # ======================================================
+      # SAME EXISTING PRODUCTION SIGNER
+      #
+      # NO GENERATED KEY.
+      # NO NEW ALIAS.
+      # NO REPLACEMENT KEYSTORE.
+      # ======================================================
+
+      - name: Production sign and verify APK
+        id: signing
+
+        shell: bash
+
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+
+        run: |
+          set -euo pipefail
+
+          for variable in \
+            APK_KEYSTORE_BASE64 \
+            APK_KEYSTORE_PASSWORD \
+            APK_KEY_ALIAS \
+            APK_KEY_PASSWORD
+
+          do
+
+            if [ -z "${!variable:-}" ]; then
+
+              echo "::error::$variable is missing"
+
+              exit 1
+
+            fi
+
+          done
+
+          RAW_APK="${{ steps.apk.outputs.apk }}"
+
+          OUT_DIR="$GITHUB_WORKSPACE/dist/$ENGINE"
+
+          mkdir -p "$OUT_DIR"
+
+          ALIGNED="$RUNNER_TEMP/${ENGINE}-aligned.apk"
+
+          FINAL_APK="$OUT_DIR/Jepong-Devxyz-${ENGINE}-runtime.apk"
+
+          KEYSTORE="$RUNNER_TEMP/jepong-production-signing.jks"
+
+          ZIPALIGN="$(
+            find "$ANDROID_HOME/build-tools" \
+              -maxdepth 2 \
+              -type f \
+              -name zipalign \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          APKSIGNER="$(
+            find "$ANDROID_HOME/build-tools" \
+              -maxdepth 2 \
+              -type f \
+              -name apksigner \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          AAPT2="$(
+            find "$ANDROID_HOME/build-tools" \
+              -maxdepth 2 \
+              -type f \
+              -name aapt2 \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          for tool in \
+            "$ZIPALIGN" \
+            "$APKSIGNER" \
+            "$AAPT2"
+
+          do
+
+            if [ ! -x "$tool" ]; then
+
+              echo "::error::Required Android build tool missing: $tool"
+
+              exit 1
+
+            fi
+
+          done
+
+          printf '%s' \
+            "$APK_KEYSTORE_BASE64" |
+            base64 --decode \
+            > "$KEYSTORE"
+
+          if [ ! -s "$KEYSTORE" ]; then
+
+            echo "::error::Decoded production keystore is empty"
+
+            exit 1
+
+          fi
+
+          echo "===== ZIPALIGN BEFORE SIGNING ====="
+
+          "$ZIPALIGN" \
+            -f \
+            -p \
+            4 \
+            "$RAW_APK" \
+            "$ALIGNED"
+
+          echo "===== SIGN WITH EXISTING PRODUCTION KEY ====="
+
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$APK_KEY_ALIAS" \
+            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$APK_KEY_PASSWORD" \
+            --out "$FINAL_APK" \
+            "$ALIGNED"
+
+          echo "===== ZIPALIGN VERIFICATION ====="
+
+          "$ZIPALIGN" \
+            -c \
+            -v \
+            4 \
+            "$FINAL_APK"
+
+          echo "===== APK SIGNATURE VERIFICATION ====="
+
+          SIGNER_OUTPUT="$(
+            "$APKSIGNER" verify \
+              --verbose \
+              --print-certs \
+              "$FINAL_APK"
+          )"
+
+          printf '%s\n' \
+            "$SIGNER_OUTPUT"
+
+          printf '%s\n' \
+            "$SIGNER_OUTPUT" \
+            > "$OUT_DIR/apksigner-verification.txt"
+
+          CERT_SHA256="$(
+            printf '%s\n' "$SIGNER_OUTPUT" |
+            sed -n \
+              's/^.*certificate SHA-256 digest:[[:space:]]*//p' |
+            head -n 1 |
+            tr '[:upper:]' '[:lower:]' |
+            tr -d ':[:space:]'
+          )"
+
+          EXPECTED="$(
+            printf '%s' \
+              "$EXPECTED_SIGNER_SHA256" |
+            tr '[:upper:]' '[:lower:]' |
+            tr -d ':[:space:]'
+          )"
+
+          if [ -z "$CERT_SHA256" ]; then
+
+            echo "::error::Could not read signer certificate SHA-256"
+
+            exit 1
+
+          fi
+
+          if [ "$CERT_SHA256" != "$EXPECTED" ]; then
+
+            echo "::error::APK was signed by an unexpected certificate"
+
+            echo "Expected: $EXPECTED"
+
+            echo "Actual:   $CERT_SHA256"
+
+            exit 1
+
+          fi
+
+          echo "✅ Existing production signer identity confirmed"
+
+          echo "===== APK MANIFEST/BADGING CHECK ====="
+
+          "$AAPT2" \
+            dump badging \
+            "$FINAL_APK" \
+            > "$OUT_DIR/aapt2-badging.txt"
+
+          cat \
+            "$OUT_DIR/aapt2-badging.txt"
+
+          PACKAGE_NAME="$(
+            sed -n \
+              "s/^package: name='\([^']*\)'.*/\1/p" \
+              "$OUT_DIR/aapt2-badging.txt" |
+            head -n 1
+          )"
+
+          VERSION_CODE="$(
+            sed -n \
+              "s/^package:.*versionCode='\([^']*\)'.*/\1/p" \
+              "$OUT_DIR/aapt2-badging.txt" |
+            head -n 1
+          )"
+
+          VERSION_NAME="$(
+            sed -n \
+              "s/^package:.*versionName='\([^']*\)'.*/\1/p" \
+              "$OUT_DIR/aapt2-badging.txt" |
+            head -n 1
+          )"
+
+          EXPECTED_PACKAGE="com.jepongdevxyz.runtime${ENGINE}"
+
+          if [ "$PACKAGE_NAME" != "$EXPECTED_PACKAGE" ]; then
+
+            echo "::error::Unexpected APK package"
+
+            echo "Expected: $EXPECTED_PACKAGE"
+
+            echo "Actual:   $PACKAGE_NAME"
+
+            exit 1
+
+          fi
+
+          if [ "$VERSION_CODE" != "1" ]; then
+
+            echo "::error::Unexpected versionCode: $VERSION_CODE"
+
+            exit 1
+
+          fi
+
+          if [ "$VERSION_NAME" != "1.0.0" ]; then
+
+            echo "::error::Unexpected versionName: $VERSION_NAME"
+
+            exit 1
+
+          fi
+
+          APK_SHA256="$(
+            sha256sum "$FINAL_APK" |
+            awk '{print $1}'
+          )"
+
+          APK_BYTES="$(
+            stat -c%s "$FINAL_APK"
+          )"
+
+          if [ "$APK_BYTES" -le 0 ]; then
+
+            echo "::error::Signed APK is empty"
+
+            exit 1
+
+          fi
+
+          echo "final_apk=$FINAL_APK" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "package=$PACKAGE_NAME" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "version_code=$VERSION_CODE" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "version_name=$VERSION_NAME" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "cert_sha256=$CERT_SHA256" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "apk_sha256=$APK_SHA256" \
+            >> "$GITHUB_OUTPUT"
+
+          echo "apk_bytes=$APK_BYTES" \
+            >> "$GITHUB_OUTPUT"
+
+          export \
+            FINAL_APK \
+            PACKAGE_NAME \
+            VERSION_CODE \
+            VERSION_NAME \
+            CERT_SHA256 \
+            APK_SHA256 \
+            APK_BYTES
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const engine=
+            process.env.ENGINE;
+
+          const outDir=
+            path.join(
+              process.env.GITHUB_WORKSPACE,
+              'dist',
+              engine
+            );
+
+          const manifest={
+
+            schemaVersion:
+              1,
+
+            commit:
+              process.env.GITHUB_SHA,
+
+            engine,
+
+            buildId:
+              process.env.BUILD_ID,
+
+            testUrl:
+              'https://whatpwacando.today/',
+
+            runtimeChecklist:
+              'docs/batch7-runtime-checklist.md',
+
+            packageName:
+              process.env.PACKAGE_NAME,
+
+            versionCode:
+              Number(
+                process.env.VERSION_CODE
+              ),
+
+            versionName:
+              process.env.VERSION_NAME,
+
+            signingMode:
+              'production-existing-keystore',
+
+            signerCertificateSha256:
+              process.env.CERT_SHA256,
+
+            apkSha256:
+              process.env.APK_SHA256,
+
+            apkSizeBytes:
+              Number(
+                process.env.APK_BYTES
+              ),
+
+            apkFile:
+              path.basename(
+                process.env.FINAL_APK
+              ),
+
+            checks:{
+
+              gradleReleaseBuild:
+                true,
+
+              zipalignVerified:
+                true,
+
+              apkSignatureVerified:
+                true,
+
+              expectedSignerVerified:
+                true,
+
+              packageVerified:
+                true,
+
+              versionVerified:
+                true
+            },
+
+            runtimeVerified:
+              false,
+
+            runtimeNote:
+              'Physical-device runtime verification is pending; record results in docs/batch7-runtime-checklist.md.'
+          };
+
+          fs.writeFileSync(
+            path.join(
+              outDir,
+              'verification-manifest.json'
+            ),
+            JSON.stringify(
+              manifest,
+              null,
+              2
+            )+'\n'
+          );
+
+          console.log(
+            JSON.stringify(
+              manifest,
+              null,
+              2
+            )
+          );
+          NODE
+
+          rm -f \
+            "$ALIGNED" \
+            "$KEYSTORE"
+
+          echo "===== FINAL PRODUCTION-SIGNED APK ====="
+
+          ls -lh \
+            "$FINAL_APK"
+
+          sha256sum \
+            "$FINAL_APK"
+
+      # ======================================================
+      # VERIFY GENERATED MANIFEST
+      # ======================================================
+
+      - name: Verify verification manifest
+
+        shell: bash
+
+        run: |
+          set -euo pipefail
+
+          MANIFEST="dist/$ENGINE/verification-manifest.json"
+
+          test -s "$MANIFEST"
+
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const file=
+            `dist/${process.env.ENGINE}/verification-manifest.json`;
+
+          const data=
+            JSON.parse(
+              fs.readFileSync(
+                file,
+                'utf8'
+              )
+            );
+
+          if(
+            data.engine!==
+            process.env.ENGINE
+          ){
+            throw new Error(
+              'Verification manifest engine mismatch'
+            );
+          }
+
+          if(
+            data.signingMode!==
+            'production-existing-keystore'
+          ){
+            throw new Error(
+              'Verification manifest signing mode mismatch'
+            );
+          }
+
+          if(
+            data.signerCertificateSha256!==
+            process.env.EXPECTED_SIGNER_SHA256
+          ){
+            throw new Error(
+              'Verification manifest signer mismatch'
+            );
+          }
+
+          if(
+            data.runtimeVerified!==false
+          ){
+            throw new Error(
+              'Runtime APK must remain unverified until the physical-device test passes'
+            );
+          }
+
+          for(
+            const [
+              key,
+              value
+            ] of Object.entries(
+              data.checks
+            )
+          ){
+            if(value!==true){
+              throw new Error(
+                `Verification check failed: ${key}`
+              );
+            }
+          }
+
+          console.log(
+            '✓ Batch 7 runtime APK manifest valid'
+          );
+          NODE
+
+      # ======================================================
+      # ARTIFACT
+      # ======================================================
+
+      - name: Upload Batch 7 runtime APK artifact
+
+        uses: actions/upload-artifact@v7
+
+        with:
+          name: batch7-runtime-${{ matrix.engine }}-apk
+
+          path: dist/${{ matrix.engine }}/
+
+          if-no-files-found: error
+
+          retention-days: 30
+
