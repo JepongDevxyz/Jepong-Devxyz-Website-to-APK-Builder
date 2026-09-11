@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "system-images;android-35;google_apis;x86_64" "emulator"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.6.0'
@@ -67,16 +67,17 @@ jobs:
         run: |
           cd "work/$BUILD_ID/project"
           gradle --no-daemon :app:assembleDebug --stacktrace
-      - name: Start emulator and run smoke
-        shell: bash
-        run: |
-          echo no | avdmanager create avd -n task3 -k "system-images;android-35;google_apis;x86_64" --force
-          nohup emulator -avd task3 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/emulator.log 2>&1 &
-          adb wait-for-device
-          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
-          APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-          test -n "$APK" && test -f "$APK"
-          node scripts/runtime/native-controls-smoke.mjs "$APK"
+      - name: Emulator runtime smoke
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+            test -n "$APK" && test -f "$APK"
+            node scripts/runtime/native-controls-smoke.mjs "$APK"
       - name: Full Task 3 verification
         shell: bash
         run: |
