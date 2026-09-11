@@ -46,7 +46,7 @@ jobs:
           mkdir -p builds
           cat > "builds/$BUILD_ID.json" <<'EOF'
           {
-            "websiteUrl": "https://example.com",
+            "websiteUrl": "http://10.0.2.2:8765/index.html",
             "appName": "Native Controls Verification",
             "packageName": "com.jepongdevxyz.nativecontrolsverify",
             "versionName": "1.0.0",
