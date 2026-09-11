@@ -86,7 +86,7 @@ export function writeNative(cfg, out, gecko=false) {
   const orientation = cfg.orientation === 'portrait' ? 'portrait' : cfg.orientation === 'landscape' ? 'landscape' : 'unspecified';
   const hardware = cfg.renderMode === 'software' ? 'false' : 'true';
   const appClass = cfg.oneSignalAppId ? `android:name=".JepongApplication"` : '';
-  write(path.join(out, 'app/src/main/AndroidManifest.xml'), `<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n${manifestPermissions(cfg)}\n    <application ${appClass} android:allowBackup="false" android:usesCleartextTraffic="true" android:hardwareAccelerated="${hardware}" android:theme="@style/AppTheme" android:label="${escXml(cfg.appName)}" android:icon="@drawable/app_icon" android:roundIcon="@drawable/app_icon">\n        <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="${orientation}">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>\n    </application>\n</manifest>\n`);
+  write(path.join(out, 'app/src/main/AndroidManifest.xml'), `<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n${manifestPermissions(cfg)}\n    <application ${appClass} android:allowBackup="false" android:usesCleartextTraffic="true" android:hardwareAccelerated="${hardware}" android:theme="@style/AppTheme" android:label="${escXml(cfg.appName)}" android:icon="@drawable/app_icon" android:roundIcon="@drawable/app_icon">\n        <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="${orientation}" android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>\n    </application>\n</manifest>\n`);
   write(path.join(out, 'app/src/main/res/values/styles.xml'), `<resources>\n<style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowLightStatusBar">false</item><item name="android:statusBarColor">#111827</item><item name="android:navigationBarColor">#111827</item><item name="android:windowActionModeOverlay">true</item></style>\n</resources>`);
   writeBranding(cfg,out);
   write(path.join(out, 'app/src/main/assets/offline.html'), `<!doctype html><meta name="viewport" content="width=device-width"><style>body{font-family:system-ui;background:#111827;color:#fff;display:grid;place-items:center;height:100vh;margin:0;text-align:center}main{max-width:440px;padding:24px}</style><main><h1>${escXml(cfg.appName)}</h1><p>${escXml(cfg.offlineFallback || 'You appear to be offline. Check your connection and try again.')}</p></main>`);
@@ -1917,6 +1917,13 @@ public class MainActivity extends Activity {
       )
     );
 
+    /*
+     * Keep the preparation UI hidden by default.
+     * It becomes visible only for real extension work
+     * or website loading/error recovery.
+     */
+    loader.setVisibility(View.GONE);
+
     ImageView icon=
       new ImageView(this);
 
@@ -2725,6 +2732,8 @@ public class MainActivity extends Activity {
 
             }else{
 
+              showExtensionLoader();
+
               setExtensionRow(
                 index,
                 "◌ "+name+
@@ -2909,6 +2918,8 @@ public class MainActivity extends Activity {
     String name,
     String url
   ){
+    showExtensionLoader();
+
     setExtensionRow(
       index,
       "↓ "+name+" • Installing...",
@@ -3206,11 +3217,32 @@ public class MainActivity extends Activity {
           " extensions enabled"
         );
 
+        final WebExtensionController verifyController=
+          runtime.getWebExtensionController();
+
         new Handler(
           Looper.getMainLooper()
         ).postDelayed(
-          this::loadWebsite,
-          250
+          ()->verifyController.list().accept(
+            verifiedExtensions->{
+              hideExtensionLoader();
+              loadWebsite();
+            },
+            verifyError->{
+              loadingStatus.setText(
+                "Extension state verification failed"
+              );
+
+              loadingCount.setText(
+                "Retry protection setup"
+              );
+
+              showExtensionActions(
+                verifyController
+              );
+            }
+          ),
+          500
         );
 
       }else{
@@ -3237,9 +3269,73 @@ public class MainActivity extends Activity {
     });
   }
 
+  void showExtensionLoader(){
+    runOnUiThread(()->{
+      if(loader==null){
+        return;
+      }
+
+      loader.setAlpha(1f);
+      loader.setVisibility(View.VISIBLE);
+
+      if(diagnostics!=null){
+        diagnostics.setVisibility(View.VISIBLE);
+      }
+    });
+  }
+
+  void hideExtensionLoader(){
+    runOnUiThread(()->{
+      if(loader!=null){
+        loader.setVisibility(View.GONE);
+      }
+    });
+  }
+
+  void showWebsiteLoader(){
+    runOnUiThread(()->{
+      if(loader==null){
+        return;
+      }
+
+      loader.setAlpha(1f);
+      loader.setVisibility(View.VISIBLE);
+
+      if(diagnostics!=null){
+        diagnostics.setVisibility(View.GONE);
+      }
+
+      if(retryButton!=null){
+        retryButton.setVisibility(View.GONE);
+      }
+
+      if(continueButton!=null){
+        continueButton.setVisibility(View.GONE);
+      }
+
+      if(loadingStatus!=null){
+        loadingStatus.setText(
+          "Opening website..."
+        );
+      }
+
+      if(loadingCount!=null){
+        loadingCount.setText(
+          "Waiting for page..."
+        );
+      }
+
+      if(loadingBar!=null){
+        loadingBar.setProgress(80);
+      }
+    });
+  }
+
   void showExtensionActions(
     WebExtensionController controller
   ){
+    showExtensionLoader();
+
     runOnUiThread(()->{
 
       retryButton.setText(
@@ -3269,6 +3365,7 @@ public class MainActivity extends Activity {
       continueButton.setOnClickListener(
         view->{
           hideActionButtons();
+          hideExtensionLoader();
           loadWebsite();
         }
       );
@@ -3291,6 +3388,7 @@ public class MainActivity extends Activity {
     runOnUiThread(()->{
 
       hideActionButtons();
+      showWebsiteLoader();
 
       loadingBar.setProgress(80);
 
@@ -3374,6 +3472,14 @@ public class MainActivity extends Activity {
     runOnUiThread(()->{
 
       cancelWebsiteTimeout();
+
+      loader.setVisibility(
+        View.VISIBLE
+      );
+
+      diagnostics.setVisibility(
+        View.GONE
+      );
 
       if(
         loader.getParent()==null

@@ -45,7 +45,52 @@ function patchManifest(){
    return tag;
  });
  const orientation=cfg.orientation==='portrait'?'portrait':cfg.orientation==='landscape'?'landscape':'unspecified';
- xml=xml.replace(/<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>/s,tag=>setAttr(tag,'android:screenOrientation',orientation));
+
+ const requiredConfigChanges=[
+   'keyboard',
+   'keyboardHidden',
+   'orientation',
+   'screenLayout',
+   'screenSize',
+   'smallestScreenSize',
+   'uiMode'
+ ];
+
+ xml=xml.replace(
+   /<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>/s,
+   tag=>{
+     tag=setAttr(
+       tag,
+       'android:screenOrientation',
+       orientation
+     );
+
+     const match=
+       tag.match(
+         /\sandroid:configChanges="([^"]*)"/
+       );
+
+     const merged=
+       new Set([
+         ...(
+           match
+             ? match[1].split('|')
+             : []
+         ),
+         ...requiredConfigChanges
+       ]);
+
+     tag=setAttr(
+       tag,
+       'android:configChanges',
+       [...merged]
+         .filter(Boolean)
+         .join('|')
+     );
+
+     return tag;
+   }
+ );
  fs.writeFileSync(manifestPath,xml);
 }
 function writeBranding(){
