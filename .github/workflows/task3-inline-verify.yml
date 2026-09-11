@@ -23,6 +23,13 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v4
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
       - name: Install Android SDK 36
         shell: bash
         run: |
@@ -74,6 +81,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
             test -n "$APK" && test -f "$APK"
