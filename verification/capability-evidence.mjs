@@ -78,3 +78,15 @@ for(const id of ['adguard','ghostery','privacyBadger','darkReader','ublock']){
     'Existing accepted Gecko WebExtension physical-device verification retained; future batches must keep regression evidence green'
   );
 }
+
+for(const id of ['camera','microphone','location','files']){
+  Object.assign(CAPABILITY_EVIDENCE.native.permissions[id],{
+    generator:true,
+    build:false,
+    emulator:false,
+    physical:false,
+    emulatorRequired:true,
+    physicalRequired:true,
+    reason:'Native generator/runtime-source regression passed; representative APK build, emulator launch, and physical-device smoke evidence are still required'
+  });
+}
