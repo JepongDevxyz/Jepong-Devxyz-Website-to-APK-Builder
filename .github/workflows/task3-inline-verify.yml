@@ -82,10 +82,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-            test -n "$APK" && test -f "$APK"
-            node scripts/runtime/native-controls-smoke.mjs "$APK"
+          script: node scripts/runtime/native-controls-smoke.mjs "$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
       - name: Full Task 3 verification
         shell: bash
         run: |
