@@ -945,3 +945,5 @@ jobs:
           if-no-files-found: error
 
           retention-days: 30
+
+# signed-verification-trigger: 20260911T062555Z
