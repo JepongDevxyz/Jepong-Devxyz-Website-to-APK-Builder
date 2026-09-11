@@ -303,11 +303,11 @@ for(const id of [
 ]){
   gecko.extensions[id]=
     cap(
-      E,
+      V,
       'geckoview-webextension-controller',
       true,
-      false,
-      'Extension installation/diagnostics compile but physical runtime verification is pending'
+      true,
+      'Physical-device extension runtime test passed'
     );
 }
 

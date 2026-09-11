@@ -307,6 +307,43 @@ for(const [
   }
 }
 
+/*
+  Gecko extensions have now passed physical-device
+  runtime verification and must be reported as Verified.
+*/
+for(const id of [
+  'adguard',
+  'ghostery',
+  'privacyBadger',
+  'darkReader',
+  'ublock'
+]){
+  const capability=
+    getCapability(
+      'gecko',
+      'extensions',
+      id
+    );
+
+  if(
+    capability.status!==
+      VERIFIED
+  ){
+    throw new Error(
+      `gecko extension ${id} must be Verified`
+    );
+  }
+
+  if(
+    !capability.compileVerified ||
+    !capability.runtimeVerified
+  ){
+    throw new Error(
+      `gecko extension ${id} verification metadata is stale`
+    );
+  }
+}
+
 console.log(
   '✓ Truthful capability matrix and exhaustive CI'
 );
