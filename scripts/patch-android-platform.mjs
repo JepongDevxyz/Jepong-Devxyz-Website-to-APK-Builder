@@ -448,26 +448,96 @@ public class MainActivity extends BridgeActivity {
       share
     );
 
-    FrameLayout.LayoutParams params=
-      new FrameLayout.LayoutParams(
-        FrameLayout.LayoutParams.MATCH_PARENT,
-        dp(54),
-        Gravity.BOTTOM
-      );
-
-    addContentView(
-      bar,
-      params
-    );
-
-    web.setPadding(
-      web.getPaddingLeft(),
-      web.getPaddingTop(),
-      web.getPaddingRight(),
-      web.getPaddingBottom()+dp(54)
+    attachCapacitorToolbar(
+      web,
+      bar
     );
 
     updateCapacitorNavigationButtons();
+  }
+
+  void attachCapacitorToolbar(
+    WebView web,
+    LinearLayout bar
+  ){
+    if(web==null || bar==null){
+      return;
+    }
+
+    ViewParent rawParent=
+      web.getParent();
+
+    if(!(rawParent instanceof ViewGroup)){
+      return;
+    }
+
+    ViewGroup parent=
+      (ViewGroup)rawParent;
+
+    int index=
+      parent.indexOfChild(web);
+
+    if(index<0){
+      return;
+    }
+
+    ViewGroup.LayoutParams original=
+      web.getLayoutParams();
+
+    parent.removeView(web);
+
+    LinearLayout shell=
+      new LinearLayout(this);
+
+    shell.setOrientation(
+      LinearLayout.VERTICAL
+    );
+
+    shell.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    bar.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    shell.addView(
+      web,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+      )
+    );
+
+    shell.addView(
+      bar,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        dp(54)
+      )
+    );
+
+    if(original!=null){
+      parent.addView(
+        shell,
+        index,
+        original
+      );
+    }else{
+      parent.addView(
+        shell,
+        index
+      );
+    }
   }
 
   void updateCapacitorNavigationButtons(){
@@ -1076,28 +1146,96 @@ public class MainActivity extends CordovaActivity {
       share
     );
 
-    FrameLayout.LayoutParams params=
-      new FrameLayout.LayoutParams(
-        FrameLayout.LayoutParams.MATCH_PARENT,
-        dp(54),
-        Gravity.BOTTOM
-      );
-
-    addContentView(
-      bar,
-      params
-    );
-
-    bar.bringToFront();
-
-    web.setPadding(
-      web.getPaddingLeft(),
-      web.getPaddingTop(),
-      web.getPaddingRight(),
-      web.getPaddingBottom()+dp(54)
+    attachCordovaToolbar(
+      web,
+      bar
     );
 
     updateCordovaNavigationButtons();
+  }
+
+  void attachCordovaToolbar(
+    WebView web,
+    LinearLayout bar
+  ){
+    if(web==null || bar==null){
+      return;
+    }
+
+    ViewParent rawParent=
+      web.getParent();
+
+    if(!(rawParent instanceof ViewGroup)){
+      return;
+    }
+
+    ViewGroup parent=
+      (ViewGroup)rawParent;
+
+    int index=
+      parent.indexOfChild(web);
+
+    if(index<0){
+      return;
+    }
+
+    ViewGroup.LayoutParams original=
+      web.getLayoutParams();
+
+    parent.removeView(web);
+
+    LinearLayout shell=
+      new LinearLayout(this);
+
+    shell.setOrientation(
+      LinearLayout.VERTICAL
+    );
+
+    shell.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    bar.setBackgroundColor(
+      Color.rgb(
+        17,
+        24,
+        39
+      )
+    );
+
+    shell.addView(
+      web,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+      )
+    );
+
+    shell.addView(
+      bar,
+      new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        dp(54)
+      )
+    );
+
+    if(original!=null){
+      parent.addView(
+        shell,
+        index,
+        original
+      );
+    }else{
+      parent.addView(
+        shell,
+        index
+      );
+    }
   }
 
   void updateCordovaNavigationButtons(){
