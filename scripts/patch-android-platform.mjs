@@ -87,6 +87,17 @@ function activityBody(base){
  const splash=cfg.splashEnabled!==false;
  const duration=Math.max(0,Math.min(15000,Number(cfg.splashDuration)||1500));
 
+ const selectedControls=cfg.controls||[];
+
+ const navigationToolbar=
+   selectedControls.includes('navigationToolbar');
+
+ const externalLinks=
+   selectedControls.includes('externalLinks');
+
+ const downloadManager=
+   selectedControls.includes('downloadManager');
+
  const common=`${transparent?'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}':''}`;
 
  const overlay=splash?`ImageView brandSplash=new ImageView(this); brandSplash.setImageResource(R.drawable.app_splash); brandSplash.setScaleType(ImageView.ScaleType.CENTER_CROP); brandSplash.setBackgroundColor(Color.rgb(17,24,39)); addContentView(brandSplash,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT)); brandSplash.bringToFront(); new Handler(Looper.getMainLooper()).postDelayed(()->{ ViewParent parent=brandSplash.getParent(); if(parent instanceof ViewGroup)((ViewGroup)parent).removeView(brandSplash); },${duration});`:'';
@@ -123,28 +134,600 @@ function activityBody(base){
  if(base==='capacitor') return `package ${cfg.packageName};
 
 import android.Manifest;
+import android.app.DownloadManager;
 import android.os.*;
 import android.graphics.Color;
+import android.net.Uri;
 import android.view.*;
-import android.widget.ImageView;
+import android.widget.*;
 import android.webkit.*;
+import android.content.*;
 import android.content.pm.PackageManager;
 import java.util.ArrayList;
+import java.util.Locale;
+
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
-  @Override protected void onCreate(Bundle savedInstanceState){
-    super.onCreate(savedInstanceState);
+
+  final String HOME=${javaString(cfg.websiteUrl)};
+
+  final boolean CAPACITOR_NAVIGATION_TOOLBAR_ENABLED=${navigationToolbar};
+  final boolean CAPACITOR_EXTERNAL_LINKS_ENABLED=${externalLinks};
+  final boolean CAPACITOR_DOWNLOAD_MANAGER_ENABLED=${downloadManager};
+
+  WebView jepongWebView;
+  Button backButton;
+  Button forwardButton;
+
+  @Override
+  protected void onCreate(
+    Bundle savedInstanceState
+  ){
+    super.onCreate(
+      savedInstanceState
+    );
+
     ${common}
+
     requestSelectedPermissions();
-    WebView w=getBridge()!=null?getBridge().getWebView():null;
+
+    WebView w=
+      getBridge()!=null
+        ? getBridge().getWebView()
+        : null;
+
+    jepongWebView=w;
+
     ${webSettings}
+
+    if(w!=null){
+
+      w.setWebViewClient(
+        new JepongBridgeWebViewClient(
+          getBridge(),
+          this
+        )
+      );
+
+      if(
+        CAPACITOR_DOWNLOAD_MANAGER_ENABLED
+      ){
+        w.setDownloadListener(
+          (
+            url,
+            userAgent,
+            contentDisposition,
+            mimeType,
+            contentLength
+          )->startCapacitorDownload(
+            url,
+            userAgent,
+            contentDisposition,
+            mimeType
+          )
+        );
+      }
+
+      if(
+        CAPACITOR_NAVIGATION_TOOLBAR_ENABLED
+      ){
+        installCapacitorNavigationToolbar(
+          w
+        );
+      }
+    }
+
     ${overlay}
+  }
+
+  static class JepongBridgeWebViewClient
+    extends BridgeWebViewClient {
+
+    final MainActivity owner;
+
+    JepongBridgeWebViewClient(
+      Bridge bridge,
+      MainActivity owner
+    ){
+      super(bridge);
+      this.owner=owner;
+    }
+
+    @Override
+    public boolean shouldOverrideUrlLoading(
+      WebView view,
+      WebResourceRequest request
+    ){
+      Uri uri=
+        request!=null
+          ? request.getUrl()
+          : null;
+
+      if(
+        uri!=null &&
+        owner.CAPACITOR_EXTERNAL_LINKS_ENABLED &&
+        Build.VERSION.SDK_INT>=24 &&
+        request.hasGesture() &&
+        owner.shouldOpenExternally(uri)
+      ){
+        owner.openExternalUrl(uri);
+        return true;
+      }
+
+      return super.shouldOverrideUrlLoading(
+        view,
+        request
+      );
+    }
+
+    @Override
+    public void onPageFinished(
+      WebView view,
+      String url
+    ){
+      super.onPageFinished(
+        view,
+        url
+      );
+
+      owner
+        .updateCapacitorNavigationButtons();
+    }
+  }
+
+  int dp(
+    int value
+  ){
+    return (int)(
+      value *
+      getResources()
+        .getDisplayMetrics()
+        .density +
+      0.5f
+    );
+  }
+
+  Button makeCapacitorButton(
+    String label
+  ){
+    Button button=
+      new Button(this);
+
+    button.setText(label);
+    button.setTextSize(10f);
+    button.setAllCaps(false);
+    button.setSingleLine(true);
+
+    return button;
+  }
+
+  void addCapacitorButton(
+    LinearLayout bar,
+    Button button
+  ){
+    bar.addView(
+      button,
+      new LinearLayout.LayoutParams(
+        0,
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        1f
+      )
+    );
+  }
+
+  void installCapacitorNavigationToolbar(
+    WebView web
+  ){
+    LinearLayout bar=
+      new LinearLayout(this);
+
+    bar.setOrientation(
+      LinearLayout.HORIZONTAL
+    );
+
+    bar.setGravity(
+      Gravity.CENTER
+    );
+
+    backButton=
+      makeCapacitorButton("Back");
+
+    forwardButton=
+      makeCapacitorButton("Next");
+
+    Button home=
+      makeCapacitorButton("Home");
+
+    Button reload=
+      makeCapacitorButton("Reload");
+
+    Button share=
+      makeCapacitorButton("Share");
+
+    backButton.setOnClickListener(
+      v->{
+        if(web.canGoBack()){
+          web.goBack();
+        }
+      }
+    );
+
+    forwardButton.setOnClickListener(
+      v->{
+        if(web.canGoForward()){
+          web.goForward();
+        }
+      }
+    );
+
+    home.setOnClickListener(
+      v->web.loadUrl(HOME)
+    );
+
+    reload.setOnClickListener(
+      v->web.reload()
+    );
+
+    share.setOnClickListener(
+      v->shareCapacitorUrl()
+    );
+
+    addCapacitorButton(
+      bar,
+      backButton
+    );
+
+    addCapacitorButton(
+      bar,
+      forwardButton
+    );
+
+    addCapacitorButton(
+      bar,
+      home
+    );
+
+    addCapacitorButton(
+      bar,
+      reload
+    );
+
+    addCapacitorButton(
+      bar,
+      share
+    );
+
+    FrameLayout.LayoutParams params=
+      new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        dp(54),
+        Gravity.BOTTOM
+      );
+
+    addContentView(
+      bar,
+      params
+    );
+
+    web.setPadding(
+      web.getPaddingLeft(),
+      web.getPaddingTop(),
+      web.getPaddingRight(),
+      web.getPaddingBottom()+dp(54)
+    );
+
+    updateCapacitorNavigationButtons();
+  }
+
+  void updateCapacitorNavigationButtons(){
+
+    if(
+      !CAPACITOR_NAVIGATION_TOOLBAR_ENABLED
+    ){
+      return;
+    }
+
+    if(backButton!=null){
+      backButton.setEnabled(
+        jepongWebView!=null &&
+        jepongWebView.canGoBack()
+      );
+    }
+
+    if(forwardButton!=null){
+      forwardButton.setEnabled(
+        jepongWebView!=null &&
+        jepongWebView.canGoForward()
+      );
+    }
+  }
+
+  void shareCapacitorUrl(){
+
+    if(jepongWebView==null){
+      return;
+    }
+
+    String url=
+      jepongWebView.getUrl();
+
+    if(
+      url==null ||
+      url.trim().isEmpty()
+    ){
+      url=HOME;
+    }
+
+    try{
+      Intent share=
+        new Intent(
+          Intent.ACTION_SEND
+        );
+
+      share.setType(
+        "text/plain"
+      );
+
+      share.putExtra(
+        Intent.EXTRA_TEXT,
+        url
+      );
+
+      startActivity(
+        Intent.createChooser(
+          share,
+          "Share link"
+        )
+      );
+
+    }catch(Exception ignored){}
+  }
+
+  String normalizeHost(
+    String host
+  ){
+    if(host==null){
+      return "";
+    }
+
+    String value=
+      host.toLowerCase(
+        Locale.ROOT
+      );
+
+    if(
+      value.startsWith(
+        "www."
+      )
+    ){
+      value=
+        value.substring(4);
+    }
+
+    return value;
+  }
+
+  boolean isHomeHost(
+    String candidate
+  ){
+    try{
+      String homeHost=
+        Uri.parse(HOME)
+          .getHost();
+
+      if(
+        homeHost==null ||
+        candidate==null
+      ){
+        return false;
+      }
+
+      homeHost=
+        normalizeHost(
+          homeHost
+        );
+
+      candidate=
+        normalizeHost(
+          candidate
+        );
+
+      return
+        candidate.equals(homeHost) ||
+        candidate.endsWith(
+          "."+homeHost
+        );
+
+    }catch(Exception ignored){
+      return false;
+    }
+  }
+
+  boolean shouldOpenExternally(
+    Uri uri
+  ){
+    if(uri==null){
+      return false;
+    }
+
+    String scheme=
+      uri.getScheme();
+
+    if(scheme==null){
+      return false;
+    }
+
+    if(
+      !"http".equalsIgnoreCase(scheme) &&
+      !"https".equalsIgnoreCase(scheme)
+    ){
+      return true;
+    }
+
+    return !isHomeHost(
+      uri.getHost()
+    );
+  }
+
+  void openExternalUrl(
+    Uri uri
+  ){
+    if(uri==null){
+      return;
+    }
+
+    try{
+      startActivity(
+        new Intent(
+          Intent.ACTION_VIEW,
+          uri
+        )
+      );
+    }catch(Exception ignored){}
+  }
+
+  void startCapacitorDownload(
+    String url,
+    String userAgent,
+    String contentDisposition,
+    String mimeType
+  ){
+    if(
+      !CAPACITOR_DOWNLOAD_MANAGER_ENABLED ||
+      url==null ||
+      url.trim().isEmpty()
+    ){
+      return;
+    }
+
+    try{
+      Uri uri=
+        Uri.parse(url);
+
+      String scheme=
+        uri.getScheme();
+
+      if(
+        scheme==null ||
+        (
+          !"http".equalsIgnoreCase(scheme) &&
+          !"https".equalsIgnoreCase(scheme)
+        )
+      ){
+        openExternalUrl(uri);
+        return;
+      }
+
+      DownloadManager.Request request=
+        new DownloadManager.Request(
+          uri
+        );
+
+      String fileName=
+        URLUtil.guessFileName(
+          url,
+          contentDisposition,
+          mimeType
+        );
+
+      if(
+        mimeType!=null &&
+        !mimeType.trim().isEmpty()
+      ){
+        request.setMimeType(
+          mimeType
+        );
+      }
+
+      if(
+        userAgent!=null &&
+        !userAgent.trim().isEmpty()
+      ){
+        request.addRequestHeader(
+          "User-Agent",
+          userAgent
+        );
+      }
+
+      String cookie=
+        CookieManager
+          .getInstance()
+          .getCookie(url);
+
+      if(
+        cookie!=null &&
+        !cookie.trim().isEmpty()
+      ){
+        request.addRequestHeader(
+          "Cookie",
+          cookie
+        );
+      }
+
+      request.setTitle(
+        fileName
+      );
+
+      request.setNotificationVisibility(
+        DownloadManager
+          .Request
+          .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+      );
+
+      if(
+        Build.VERSION.SDK_INT>=29
+      ){
+        request.setDestinationInExternalPublicDir(
+          Environment.DIRECTORY_DOWNLOADS,
+          fileName
+        );
+      }else{
+        request.setDestinationInExternalFilesDir(
+          this,
+          Environment.DIRECTORY_DOWNLOADS,
+          fileName
+        );
+      }
+
+      DownloadManager manager=
+        (DownloadManager)
+          getSystemService(
+            DOWNLOAD_SERVICE
+          );
+
+      if(manager==null){
+        throw new IllegalStateException(
+          "DownloadManager unavailable"
+        );
+      }
+
+      manager.enqueue(
+        request
+      );
+
+      Toast.makeText(
+        this,
+        "Download started",
+        Toast.LENGTH_SHORT
+      ).show();
+
+    }catch(Exception error){
+
+      Toast.makeText(
+        this,
+        "Unable to start download",
+        Toast.LENGTH_SHORT
+      ).show();
+    }
   }
 
   ${permissionMethods}
 }
 `;
+
 
  return `package ${cfg.packageName};
 

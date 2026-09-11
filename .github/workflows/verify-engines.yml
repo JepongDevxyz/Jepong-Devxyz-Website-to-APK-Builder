@@ -80,7 +80,11 @@ jobs:
               SIZE_OPTIMIZATION=true
               ABI_TARGET="arm64-v8a"
               ;;
-            capacitor|cordova)
+            capacitor)
+              CONTROLS='["transparentNav","pinchZoom","navigationToolbar","externalLinks","downloadManager"]'
+              EXTENSIONS='[]'
+              ;;
+            cordova)
               CONTROLS='["transparentNav","pinchZoom"]'
               EXTENSIONS='[]'
               ;;

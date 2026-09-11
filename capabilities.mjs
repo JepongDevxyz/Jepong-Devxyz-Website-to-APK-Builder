@@ -384,6 +384,33 @@ for(const id of [
     );
 }
 
+capacitor.controls.navigationToolbar=
+  cap(
+    E,
+    'capacitor-webview-navigation-toolbar',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
+capacitor.controls.externalLinks=
+  cap(
+    E,
+    'capacitor-bridge-webview-client-routing',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
+capacitor.controls.downloadManager=
+  cap(
+    E,
+    'android-download-manager',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
 /* -------------------------------------------------
    Cordova
 -------------------------------------------------- */
