@@ -10,11 +10,78 @@ permissions:
 jobs:
   native-controls:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
+    env:
+      BUILD_ID: task3-native-controls
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Native controls verification
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "system-images;android-35;google_apis;x86_64" "emulator"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+      - name: Native controls generator verification
         run: node scripts/test-native-controls-verification.mjs
+      - name: Create representative Native controls configuration
+        shell: bash
+        run: |
+          mkdir -p builds
+          cat > "builds/$BUILD_ID.json" <<'EOF'
+          {
+            "websiteUrl": "https://example.com",
+            "appName": "Native Controls Verification",
+            "packageName": "com.jepongdevxyz.nativecontrolsverify",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "engine": "native",
+            "renderMode": "default",
+            "orientation": "auto",
+            "permissions": [],
+            "controls": ["pullRefresh","hideScrollbars","transparentNav","pinchZoom","disableCopy","blockAdsRedirects","navigationToolbar","externalLinks","downloadManager"],
+            "extensions": [],
+            "oneSignalAppId": "",
+            "offlineFallback": "Offline",
+            "iconDataUrl": "",
+            "splashDataUrl": "",
+            "splashEnabled": false,
+            "splashDuration": 0,
+            "sizeOptimization": false,
+            "abiTarget": "universal"
+          }
+          EOF
+          node scripts/build.mjs prepare --build-id "$BUILD_ID"
+          node scripts/build.mjs generate --build-id "$BUILD_ID"
+      - name: Build Native controls APK
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Start emulator and run smoke
+        shell: bash
+        run: |
+          echo no | avdmanager create avd -n task3 -k "system-images;android-35;google_apis;x86_64" --force
+          nohup emulator -avd task3 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect >/tmp/emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
+          APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+          test -n "$APK" && test -f "$APK"
+          node scripts/runtime/native-controls-smoke.mjs "$APK"
+      - name: Full Task 3 verification
+        shell: bash
+        run: |
+          node scripts/test-native-controls-verification.mjs
+          node scripts/test-capability-evidence-policy.mjs
+          node scripts/test-capability-truth.mjs
+          npm test
+          npm run check
