@@ -141,7 +141,13 @@ for(const item of builds){
     'setDecorFitsSystemWindows(false)',
     'navigationProgress',
     'showNavigationProgress',
-    'finishNavigationProgress'
+    'finishNavigationProgress',
+    'Powered by Jepong Devxyz',
+    'showExitConfirmation',
+    'handleAppBack',
+    'registerOnBackInvokedCallback',
+    'Color.rgb(0,229,255)',
+    'setScaleY(1.8f)'
   ];
 
   const compactMain=
@@ -168,7 +174,8 @@ for(const item of builds){
     for(const token of [
       'recoverableWebsiteTimeout',
       'Finishing website...',
-      'Website loading timed out.'
+      'Website loading timed out.',
+      'loadingBar.getProgress()>=100'
     ]){
       if(
         !compactMain.includes(

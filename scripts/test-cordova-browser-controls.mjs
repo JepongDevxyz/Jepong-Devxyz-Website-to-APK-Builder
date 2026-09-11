@@ -234,7 +234,13 @@ const required=[
   'navigationProgress',
   'showNavigationProgress',
   'finishNavigationProgress',
-  'setDecorFitsSystemWindows(false)'
+  'setDecorFitsSystemWindows(false)',
+  'Powered by Jepong Devxyz',
+  'showExitConfirmation',
+  'handleAppBack',
+  'registerOnBackInvokedCallback',
+  'Color.rgb(0,229,255)',
+  'setScaleY(1.8f)'
 ];
 
 for(const token of required){

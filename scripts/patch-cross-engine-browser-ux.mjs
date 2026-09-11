@@ -1140,28 +1140,330 @@ function patchCordova(source){
   return out;
 }
 
+
+function applyAppShellEnhancements(
+  source,
+  engine
+){
+  let out=String(source);
+
+  const backBody=
+    engine==='gecko'
+      ? `
+    if(
+      session!=null &&
+      canGoBack
+    ){
+      showNavigationProgress();
+      session.goBack();
+      return;
+    }
+
+    showExitConfirmation();
+`
+      : engine==='native'
+        ? `
+    if(
+      web!=null &&
+      web.canGoBack()
+    ){
+      showNavigationProgress();
+      web.goBack();
+      return;
+    }
+
+    showExitConfirmation();
+`
+        : `
+    if(
+      jepongWebView!=null &&
+      jepongWebView.canGoBack()
+    ){
+      showNavigationProgress();
+      jepongWebView.goBack();
+      return;
+    }
+
+    showExitConfirmation();
+`;
+
+  const helpers=`
+  void showPoweredByToast(){
+    Toast.makeText(
+      getApplicationContext(),
+      "Powered by Jepong Devxyz",
+      Toast.LENGTH_SHORT
+    ).show();
+  }
+
+  void showExitConfirmation(){
+    new android.app.AlertDialog
+      .Builder(this)
+      .setTitle(
+        "Exit app?"
+      )
+      .setMessage(
+        "Do you want to exit?"
+      )
+      .setNegativeButton(
+        "Cancel",
+        null
+      )
+      .setPositiveButton(
+        "Exit",
+        (dialog,which)->finish()
+      )
+      .show();
+  }
+
+  void handleAppBack(){
+${backBody}
+  }
+
+  void installBackHandler(){
+    if(
+      Build.VERSION.SDK_INT>=33
+    ){
+      getOnBackInvokedDispatcher()
+        .registerOnBackInvokedCallback(
+          android.window
+            .OnBackInvokedDispatcher
+            .PRIORITY_DEFAULT,
+          this::handleAppBack
+        );
+    }
+  }
+
+  @Override
+  public void onBackPressed(){
+    handleAppBack();
+  }
+
+`;
+
+  out=replaceOnce(
+    out,
+    `  void applySystemSafeArea(
+`,
+    helpers+
+    `  void applySystemSafeArea(
+`,
+    `${engine} app-shell helpers`
+  );
+
+  const createMatches=
+    out.match(
+      /super\.onCreate\([^)]+\);/g
+    );
+
+  if(
+    !createMatches ||
+    createMatches.length!==1
+  ){
+    throw new Error(
+      `${engine} onCreate marker missing or ambiguous`
+    );
+  }
+
+  out=out.replace(
+    createMatches[0],
+    `${createMatches[0]}
+
+    showPoweredByToast();
+    installBackHandler();`
+  );
+
+  const oldProgress=`    bar.setMax(100);
+    bar.setProgress(5);
+    bar.setIndeterminate(true);
+
+    bar.setVisibility(
+      View.GONE
+    );`;
+
+  const newProgress=`    bar.setMax(100);
+    bar.setProgress(5);
+    bar.setIndeterminate(true);
+
+    final int accent=
+      Color.rgb(0,229,255);
+
+    if(
+      bar.getIndeterminateDrawable()!=null
+    ){
+      bar.getIndeterminateDrawable()
+        .setColorFilter(
+          accent,
+          android.graphics.PorterDuff.Mode.SRC_IN
+        );
+    }
+
+    if(
+      bar.getProgressDrawable()!=null
+    ){
+      bar.getProgressDrawable()
+        .setColorFilter(
+          accent,
+          android.graphics.PorterDuff.Mode.SRC_IN
+        );
+    }
+
+    bar.setScaleY(1.8f);
+
+    bar.setVisibility(
+      View.GONE
+    );`;
+
+  out=replaceOnce(
+    out,
+    oldProgress,
+    newProgress,
+    `${engine} navigation progress styling`
+  );
+
+  if(engine==='native'){
+
+    const oldBack=
+      `  @Override public void onBackPressed(){ if(web!=null&&web.canGoBack()) web.goBack(); else super.onBackPressed(); }
+`;
+
+    out=replaceOnce(
+      out,
+      oldBack,
+      '',
+      'native old back handler'
+    );
+  }
+
+  if(engine==='gecko'){
+
+    const oldBack=`  @Override
+  public void onBackPressed(){
+    if(
+      session!=null &&
+      canGoBack
+    ){
+      session.goBack();
+    }else{
+      super.onBackPressed();
+    }
+  }
+`;
+
+    out=replaceOnce(
+      out,
+      oldBack,
+      '',
+      'gecko old back handler'
+    );
+
+    const oldError=`  void showWebsiteError(
+    String message
+  ){
+    runOnUiThread(()->{
+
+      waitingForInitialWebsitePaint=false;
+      cancelWebsiteTimeout();`;
+
+    const newError=`  void showWebsiteError(
+    String message
+  ){
+    runOnUiThread(()->{
+
+      if(
+        loadingBar!=null &&
+        loadingBar.getProgress()>=100
+      ){
+        recoverableWebsiteTimeout=false;
+        waitingForInitialWebsitePaint=false;
+
+        cancelWebsiteTimeout();
+        finishNavigationProgress();
+        finishLoader();
+        return;
+      }
+
+      waitingForInitialWebsitePaint=false;
+      cancelWebsiteTimeout();`;
+
+    out=replaceOnce(
+      out,
+      oldError,
+      newError,
+      'gecko 100 percent error auto finish'
+    );
+
+    const oldRecovery=`      if(
+        recoverableWebsiteTimeout &&
+        safe>=100
+      ){
+        if(retryButton!=null){
+          retryButton.setVisibility(
+            View.GONE
+          );
+        }
+
+        loadingStatus.setText(
+          "Finishing website..."
+        );
+      }`;
+
+    const newRecovery=`      if(
+        recoverableWebsiteTimeout &&
+        safe>=100
+      ){
+        recoverableWebsiteTimeout=false;
+        waitingForInitialWebsitePaint=false;
+
+        if(retryButton!=null){
+          retryButton.setVisibility(
+            View.GONE
+          );
+        }
+
+        loadingStatus.setText(
+          "Finishing website..."
+        );
+
+        cancelWebsiteTimeout();
+        finishNavigationProgress();
+        finishLoader();
+      }`;
+
+    out=replaceOnce(
+      out,
+      oldRecovery,
+      newRecovery,
+      'gecko later 100 percent auto finish'
+    );
+  }
+
+  return out;
+}
+
 export function patchCrossEngineBrowserUxSource(
   source,
   engine
 ){
+  let patched;
+
   if(engine==='native'){
-    return patchNative(source);
+    patched=patchNative(source);
+  }else if(engine==='gecko'){
+    patched=patchGecko(source);
+  }else if(engine==='capacitor'){
+    patched=patchCapacitor(source);
+  }else if(engine==='cordova'){
+    patched=patchCordova(source);
+  }else{
+    throw new Error(
+      `Unsupported browser UX engine: ${engine}`
+    );
   }
 
-  if(engine==='gecko'){
-    return patchGecko(source);
-  }
-
-  if(engine==='capacitor'){
-    return patchCapacitor(source);
-  }
-
-  if(engine==='cordova'){
-    return patchCordova(source);
-  }
-
-  throw new Error(
-    `Unsupported browser UX engine: ${engine}`
+  return applyAppShellEnhancements(
+    patched,
+    engine
   );
 }
 
