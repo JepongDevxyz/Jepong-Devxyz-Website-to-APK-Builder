@@ -1,0 +1,20 @@
+name: Task 2 Inline Verify
+
+on:
+  push:
+    branches: [capability-verification-task2]
+
+permissions:
+  contents: read
+
+jobs:
+  red-green-native-permissions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Native permission verification
+        run: node scripts/test-native-permissions.mjs
