@@ -82,11 +82,11 @@ for(const id of ['adguard','ghostery','privacyBadger','darkReader','ublock']){
 for(const id of ['camera','microphone','location','files']){
   Object.assign(CAPABILITY_EVIDENCE.native.permissions[id],{
     generator:true,
-    build:false,
+    build:true,
     emulator:false,
     physical:false,
     emulatorRequired:true,
     physicalRequired:true,
-    reason:'Native generator/runtime-source regression passed; representative APK build, emulator launch, and physical-device smoke evidence are still required'
+    reason:'Native generator/runtime-source regression and representative signed APK build passed; emulator launch and physical-device smoke evidence are still required'
   });
 }
