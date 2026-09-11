@@ -472,6 +472,33 @@ for(const id of [
     );
 }
 
+cordova.controls.navigationToolbar=
+  cap(
+    E,
+    'cordova-system-webview-navigation-toolbar',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
+cordova.controls.externalLinks=
+  cap(
+    E,
+    'cordova-system-webview-client-routing',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
+cordova.controls.downloadManager=
+  cap(
+    E,
+    'android-download-manager',
+    false,
+    false,
+    'Implementation exists; Android CI and physical runtime verification are pending'
+  );
+
 /* Firefox WebExtensions are intentionally Gecko-only. */
 for(const engine of [native,capacitor,cordova]){
   for(const feature of FEATURES.extensions){

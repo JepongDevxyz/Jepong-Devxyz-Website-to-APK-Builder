@@ -85,7 +85,7 @@ jobs:
               EXTENSIONS='[]'
               ;;
             cordova)
-              CONTROLS='["transparentNav","pinchZoom"]'
+              CONTROLS='["transparentNav","pinchZoom","navigationToolbar","externalLinks","downloadManager"]'
               EXTENSIONS='[]'
               ;;
           esac

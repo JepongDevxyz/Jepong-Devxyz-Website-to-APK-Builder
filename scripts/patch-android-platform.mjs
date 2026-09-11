@@ -732,38 +732,650 @@ public class MainActivity extends BridgeActivity {
  return `package ${cfg.packageName};
 
 import android.Manifest;
+import android.app.DownloadManager;
 import android.os.*;
 import android.graphics.Color;
+import android.net.Uri;
 import android.view.*;
-import android.widget.ImageView;
+import android.widget.*;
 import android.webkit.*;
+import android.content.*;
 import android.content.pm.PackageManager;
+
 import java.util.ArrayList;
+import java.util.Locale;
+
 import org.apache.cordova.CordovaActivity;
+import org.apache.cordova.CordovaWebViewEngine;
+import org.apache.cordova.engine.SystemWebView;
+import org.apache.cordova.engine.SystemWebViewClient;
+import org.apache.cordova.engine.SystemWebViewEngine;
 
 public class MainActivity extends CordovaActivity {
-  @Override public void onCreate(Bundle savedInstanceState){
-    super.onCreate(savedInstanceState);
+
+  final String HOME=${javaString(cfg.websiteUrl)};
+
+  final boolean CORDOVA_NAVIGATION_TOOLBAR_ENABLED=${navigationToolbar};
+  final boolean CORDOVA_EXTERNAL_LINKS_ENABLED=${externalLinks};
+  final boolean CORDOVA_DOWNLOAD_MANAGER_ENABLED=${downloadManager};
+
+  SystemWebView jepongWebView;
+
+  Button backButton;
+  Button forwardButton;
+
+  @Override
+  public void onCreate(
+    Bundle savedInstanceState
+  ){
+    super.onCreate(
+      savedInstanceState
+    );
+
     ${common}
+
     requestSelectedPermissions();
+
     loadUrl(launchUrl);
 
-    View raw=appView!=null?appView.getView():null;
-    if(raw instanceof WebView){
-      WebView w=(WebView)raw;
+    View raw=
+      appView!=null
+        ? appView.getView()
+        : null;
+
+    if(
+      raw instanceof SystemWebView
+    ){
+      SystemWebView w=
+        (SystemWebView)raw;
+
+      jepongWebView=w;
+
       ${webSettings}
+
+      CordovaWebViewEngine rawEngine=
+        appView.getEngine();
+
+      if(
+        rawEngine instanceof SystemWebViewEngine
+      ){
+        w.setWebViewClient(
+          new JepongSystemWebViewClient(
+            (SystemWebViewEngine)rawEngine,
+            this
+          )
+        );
+      }
+
+      if(
+        CORDOVA_DOWNLOAD_MANAGER_ENABLED
+      ){
+        w.setDownloadListener(
+          (
+            url,
+            userAgent,
+            contentDisposition,
+            mimeType,
+            contentLength
+          )->startCordovaDownload(
+            url,
+            userAgent,
+            contentDisposition,
+            mimeType
+          )
+        );
+      }
+
+      if(
+        CORDOVA_NAVIGATION_TOOLBAR_ENABLED
+      ){
+        installCordovaNavigationToolbar(
+          w
+        );
+      }
     }
 
     ${overlay}
   }
 
-  @Override protected boolean showInitialSplashScreen(){
+  static class JepongSystemWebViewClient
+    extends SystemWebViewClient {
+
+    final MainActivity owner;
+
+    JepongSystemWebViewClient(
+      SystemWebViewEngine engine,
+      MainActivity owner
+    ){
+      super(engine);
+      this.owner=owner;
+    }
+
+    @Override
+    public boolean shouldOverrideUrlLoading(
+      WebView view,
+      WebResourceRequest request
+    ){
+      Uri uri=
+        request!=null
+          ? request.getUrl()
+          : null;
+
+      if(
+        uri!=null &&
+        owner.CORDOVA_EXTERNAL_LINKS_ENABLED &&
+        Build.VERSION.SDK_INT>=24 &&
+        request.hasGesture() &&
+        owner.shouldOpenExternally(uri)
+      ){
+        owner.openExternalUrl(uri);
+        return true;
+      }
+
+      return super.shouldOverrideUrlLoading(
+        view,
+        request
+      );
+    }
+
+    @Override
+    public void onPageFinished(
+      WebView view,
+      String url
+    ){
+      super.onPageFinished(
+        view,
+        url
+      );
+
+      owner.updateCordovaNavigationButtons();
+    }
+  }
+
+  int dp(
+    int value
+  ){
+    return (int)(
+      value *
+      getResources()
+        .getDisplayMetrics()
+        .density +
+      0.5f
+    );
+  }
+
+  Button makeCordovaButton(
+    String label
+  ){
+    Button button=
+      new Button(this);
+
+    button.setText(label);
+    button.setTextSize(10f);
+    button.setAllCaps(false);
+    button.setSingleLine(true);
+
+    return button;
+  }
+
+  void addCordovaButton(
+    LinearLayout bar,
+    Button button
+  ){
+    bar.addView(
+      button,
+      new LinearLayout.LayoutParams(
+        0,
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        1f
+      )
+    );
+  }
+
+  void installCordovaNavigationToolbar(
+    WebView web
+  ){
+    LinearLayout bar=
+      new LinearLayout(this);
+
+    bar.setOrientation(
+      LinearLayout.HORIZONTAL
+    );
+
+    bar.setGravity(
+      Gravity.CENTER
+    );
+
+    backButton=
+      makeCordovaButton(
+        "Back"
+      );
+
+    forwardButton=
+      makeCordovaButton(
+        "Next"
+      );
+
+    Button home=
+      makeCordovaButton(
+        "Home"
+      );
+
+    Button reload=
+      makeCordovaButton(
+        "Reload"
+      );
+
+    Button share=
+      makeCordovaButton(
+        "Share"
+      );
+
+    backButton.setOnClickListener(
+      v->{
+        if(web.canGoBack()){
+          web.goBack();
+        }
+      }
+    );
+
+    forwardButton.setOnClickListener(
+      v->{
+        if(web.canGoForward()){
+          web.goForward();
+        }
+      }
+    );
+
+    home.setOnClickListener(
+      v->{
+        if(appView!=null){
+          appView.loadUrl(HOME);
+        }
+      }
+    );
+
+    reload.setOnClickListener(
+      v->web.reload()
+    );
+
+    share.setOnClickListener(
+      v->shareCordovaUrl()
+    );
+
+    addCordovaButton(
+      bar,
+      backButton
+    );
+
+    addCordovaButton(
+      bar,
+      forwardButton
+    );
+
+    addCordovaButton(
+      bar,
+      home
+    );
+
+    addCordovaButton(
+      bar,
+      reload
+    );
+
+    addCordovaButton(
+      bar,
+      share
+    );
+
+    FrameLayout.LayoutParams params=
+      new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        dp(54),
+        Gravity.BOTTOM
+      );
+
+    addContentView(
+      bar,
+      params
+    );
+
+    bar.bringToFront();
+
+    web.setPadding(
+      web.getPaddingLeft(),
+      web.getPaddingTop(),
+      web.getPaddingRight(),
+      web.getPaddingBottom()+dp(54)
+    );
+
+    updateCordovaNavigationButtons();
+  }
+
+  void updateCordovaNavigationButtons(){
+
+    if(
+      !CORDOVA_NAVIGATION_TOOLBAR_ENABLED
+    ){
+      return;
+    }
+
+    if(backButton!=null){
+      backButton.setEnabled(
+        jepongWebView!=null &&
+        jepongWebView.canGoBack()
+      );
+    }
+
+    if(forwardButton!=null){
+      forwardButton.setEnabled(
+        jepongWebView!=null &&
+        jepongWebView.canGoForward()
+      );
+    }
+  }
+
+  void shareCordovaUrl(){
+
+    if(jepongWebView==null){
+      return;
+    }
+
+    String url=
+      jepongWebView.getUrl();
+
+    if(
+      url==null ||
+      url.trim().isEmpty()
+    ){
+      url=HOME;
+    }
+
+    try{
+      Intent share=
+        new Intent(
+          Intent.ACTION_SEND
+        );
+
+      share.setType(
+        "text/plain"
+      );
+
+      share.putExtra(
+        Intent.EXTRA_TEXT,
+        url
+      );
+
+      startActivity(
+        Intent.createChooser(
+          share,
+          "Share link"
+        )
+      );
+
+    }catch(Exception ignored){}
+  }
+
+  String normalizeHost(
+    String host
+  ){
+    if(host==null){
+      return "";
+    }
+
+    String value=
+      host.toLowerCase(
+        Locale.ROOT
+      );
+
+    if(
+      value.startsWith(
+        "www."
+      )
+    ){
+      value=
+        value.substring(4);
+    }
+
+    return value;
+  }
+
+  boolean isHomeHost(
+    String candidate
+  ){
+    try{
+      String homeHost=
+        Uri.parse(HOME)
+          .getHost();
+
+      if(
+        homeHost==null ||
+        candidate==null
+      ){
+        return false;
+      }
+
+      homeHost=
+        normalizeHost(
+          homeHost
+        );
+
+      candidate=
+        normalizeHost(
+          candidate
+        );
+
+      return
+        candidate.equals(homeHost) ||
+        candidate.endsWith(
+          "."+homeHost
+        );
+
+    }catch(Exception ignored){
+      return false;
+    }
+  }
+
+  boolean shouldOpenExternally(
+    Uri uri
+  ){
+    if(uri==null){
+      return false;
+    }
+
+    String scheme=
+      uri.getScheme();
+
+    if(scheme==null){
+      return false;
+    }
+
+    /*
+      Only explicit HTTP/HTTPS off-site links are handled
+      here. Other schemes stay with Cordova's own routing.
+    */
+    if(
+      !"http".equalsIgnoreCase(scheme) &&
+      !"https".equalsIgnoreCase(scheme)
+    ){
+      return false;
+    }
+
+    return !isHomeHost(
+      uri.getHost()
+    );
+  }
+
+  void openExternalUrl(
+    Uri uri
+  ){
+    if(uri==null){
+      return;
+    }
+
+    try{
+      Intent intent=
+        new Intent(
+          Intent.ACTION_VIEW,
+          uri
+        );
+
+      intent.addCategory(
+        Intent.CATEGORY_BROWSABLE
+      );
+
+      startActivity(intent);
+
+    }catch(Exception ignored){}
+  }
+
+  void startCordovaDownload(
+    String url,
+    String userAgent,
+    String contentDisposition,
+    String mimeType
+  ){
+    if(
+      !CORDOVA_DOWNLOAD_MANAGER_ENABLED ||
+      url==null ||
+      url.trim().isEmpty()
+    ){
+      return;
+    }
+
+    try{
+      Uri uri=
+        Uri.parse(url);
+
+      String scheme=
+        uri.getScheme();
+
+      if(
+        scheme==null ||
+        (
+          !"http".equalsIgnoreCase(scheme) &&
+          !"https".equalsIgnoreCase(scheme)
+        )
+      ){
+        return;
+      }
+
+      DownloadManager.Request request=
+        new DownloadManager.Request(
+          uri
+        );
+
+      String fileName=
+        URLUtil.guessFileName(
+          url,
+          contentDisposition,
+          mimeType
+        );
+
+      if(
+        mimeType!=null &&
+        !mimeType.trim().isEmpty()
+      ){
+        request.setMimeType(
+          mimeType
+        );
+      }
+
+      if(
+        userAgent!=null &&
+        !userAgent.trim().isEmpty()
+      ){
+        request.addRequestHeader(
+          "User-Agent",
+          userAgent
+        );
+      }
+
+      String cookie=
+        CookieManager
+          .getInstance()
+          .getCookie(url);
+
+      if(
+        cookie!=null &&
+        !cookie.trim().isEmpty()
+      ){
+        request.addRequestHeader(
+          "Cookie",
+          cookie
+        );
+      }
+
+      request.setTitle(
+        fileName
+      );
+
+      request.setDescription(
+        "Downloading file"
+      );
+
+      request.setNotificationVisibility(
+        DownloadManager
+          .Request
+          .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+      );
+
+      if(
+        Build.VERSION.SDK_INT>=29
+      ){
+        request.setDestinationInExternalPublicDir(
+          Environment.DIRECTORY_DOWNLOADS,
+          fileName
+        );
+      }else{
+        request.setDestinationInExternalFilesDir(
+          this,
+          Environment.DIRECTORY_DOWNLOADS,
+          fileName
+        );
+      }
+
+      DownloadManager manager=
+        (DownloadManager)
+          getSystemService(
+            DOWNLOAD_SERVICE
+          );
+
+      if(manager==null){
+        throw new IllegalStateException(
+          "DownloadManager unavailable"
+        );
+      }
+
+      manager.enqueue(
+        request
+      );
+
+      Toast.makeText(
+        this,
+        "Download started",
+        Toast.LENGTH_SHORT
+      ).show();
+
+    }catch(Exception error){
+
+      Toast.makeText(
+        this,
+        "Unable to start download",
+        Toast.LENGTH_SHORT
+      ).show();
+    }
+  }
+
+  @Override
+  protected boolean showInitialSplashScreen(){
     return ${splash};
   }
 
   ${permissionMethods}
 }
 `;
+
 }
 function writeActivity(){
  const javaRoot=path.join(appRoot,'src/main/java');
