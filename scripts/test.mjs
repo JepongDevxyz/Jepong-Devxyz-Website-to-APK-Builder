@@ -121,21 +121,21 @@ for(const requiredSignerToken of [
 
   if(
     getCapability('native','permissions','contacts').status!==
-      CAPABILITY_STATUS.EXPERIMENTAL
+      CAPABILITY_STATUS.UNSUPPORTED
   ){
     throw new Error(
-      'Native Contacts foundation must remain Experimental'
+      'Native Contacts must remain Unsupported until a real website bridge exists'
     );
   }
 
   if(
-    !getSelectableFeatureIds(
+    getSelectableFeatureIds(
       'native',
       'permissions'
     ).includes('contacts')
   ){
     throw new Error(
-      'Experimental Native Contacts must remain selectable'
+      'Unsupported Native Contacts must not be selectable'
     );
   }
 
@@ -164,14 +164,28 @@ for(const requiredSignerToken of [
   const experimentalErrors=
     validateCapabilitySelection({
       engine:'native',
-      permissions:['contacts'],
+      permissions:['camera'],
       controls:[],
       extensions:[]
     });
 
   if(experimentalErrors.length!==0){
     throw new Error(
-      'Experimental capability was incorrectly rejected'
+      'Experimental Native Camera was incorrectly rejected'
+    );
+  }
+
+  const unsupportedPermissionErrors=
+    validateCapabilitySelection({
+      engine:'native',
+      permissions:['contacts'],
+      controls:[],
+      extensions:[]
+    });
+
+  if(unsupportedPermissionErrors.length===0){
+    throw new Error(
+      'Unsupported Native Contacts was incorrectly accepted'
     );
   }
 
@@ -235,13 +249,13 @@ for(const requiredSignerToken of [
   }
 }
 
-const allPermissions=['camera','microphone','notification','location','media','contacts','calendar','biometrics','files','bluetooth','sensors'];
-const nativeControls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects'];
-const geckoExtensions=['adguard','ghostery','privacyBadger','darkReader','ublock'];
-const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:allPermissions,controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500,apkSigner:true};
+const base={websiteUrl:'https://example.com',appName:'Jepong Devxyz',packageName:'com.jepongdevxyz.app',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:[],controls:[],extensions:[],oneSignalAppId:'11111111-1111-1111-1111-111111111111',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:true,splashDuration:1500,apkSigner:true};
 for(const engine of ['native','gecko','capacitor','cordova']){
-  const id=`test-${engine}`; fs.mkdirSync(path.join(root,'builds'),{recursive:true}); const controls=engine==='native'?nativeControls:engine==='gecko'?['transparentNav','navigationToolbar','externalLinks','downloadManager']:['transparentNav','pinchZoom'];
-  const extensions=engine==='gecko'?geckoExtensions:[];
+  const id=`test-${engine}`;
+  fs.mkdirSync(path.join(root,'builds'),{recursive:true});
+  const permissions=getSelectableFeatureIds(engine,'permissions');
+  const controls=getSelectableFeatureIds(engine,'controls');
+  const extensions=getSelectableFeatureIds(engine,'extensions');
   const sizeOptimization=engine==='gecko';
   const abiTarget=sizeOptimization?'arm64-v8a':'universal';
   fs.writeFileSync(
@@ -249,6 +263,7 @@ for(const engine of ['native','gecko','capacitor','cordova']){
     JSON.stringify({
       ...base,
       engine,
+      permissions,
       controls,
       extensions,
       sizeOptimization,

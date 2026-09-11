@@ -129,12 +129,8 @@ native.permissions.files=
   );
 
 native.permissions.notification=
-  cap(
-    E,
-    'native-android-notification-foundation',
-    true,
-    false,
-    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
+  unsupported(
+    'Normal Web Notifications are not implemented for Native WebView yet'
   );
 
 for(const id of [
@@ -146,12 +142,8 @@ for(const id of [
   'sensors'
 ]){
   native.permissions[id]=
-    cap(
-      E,
-      'native-android-permission-foundation',
-      true,
-      false,
-      'Android permission wiring exists; complete website-facing native effect is still being added'
+    unsupported(
+      'Android permission declaration alone is not a website-facing API; a secure Native bridge is not implemented'
     );
 }
 
@@ -177,27 +169,27 @@ native.controls.navigationToolbar=
   cap(
     E,
     'native-webview-navigation-toolbar',
+    true,
     false,
-    false,
-    'Native navigation toolbar generator is implemented; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 native.controls.externalLinks=
   cap(
     E,
     'native-webview-external-routing',
+    true,
     false,
-    false,
-    'User-clicked off-site links are routed to Android external apps; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 native.controls.downloadManager=
   cap(
     E,
     'android-download-manager',
+    true,
     false,
-    false,
-    'HTTP/HTTPS downloads use Android DownloadManager with WebView cookies; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 /* -------------------------------------------------
@@ -238,9 +230,9 @@ gecko.permissions.notification=
   cap(
     E,
     'geckoview-web-notification-delegate',
+    true,
     false,
-    false,
-    'Implementation exists but current Android notification compile regression must be fixed and runtime-tested'
+    'GeckoView Web Notification delegate compiles successfully; physical runtime verification is pending'
   );
 
 gecko.permissions.files=
@@ -261,12 +253,8 @@ for(const id of [
   'sensors'
 ]){
   gecko.permissions[id]=
-    cap(
-      E,
-      'geckoview-android-permission-foundation',
-      true,
-      false,
-      'Android permission foundation exists; complete website-facing native effect is still being added'
+    unsupported(
+      'Android permission declaration alone is not a website-facing API; a secure Gecko bridge is not implemented'
     );
 }
 
@@ -336,20 +324,16 @@ for(const id of [
   capacitor.permissions[id]=
     cap(
       E,
-      'capacitor-android-webview-foundation',
+      'capacitor-bridge-webview-runtime',
       true,
       false,
-      'Android/WebView foundation exists but physical runtime verification is pending'
+      'Capacitor WebView runtime path compiles; physical runtime verification is pending'
     );
 }
 
 capacitor.permissions.notification=
-  cap(
-    E,
-    'capacitor-android-notification-foundation',
-    true,
-    false,
-    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
+  unsupported(
+    'Normal Web Notifications are not implemented for Capacitor yet'
   );
 
 for(const id of [
@@ -361,12 +345,8 @@ for(const id of [
   'sensors'
 ]){
   capacitor.permissions[id]=
-    cap(
-      E,
-      'capacitor-android-permission-foundation',
-      true,
-      false,
-      'Android permission wiring exists; complete website-facing native effect is still being added'
+    unsupported(
+      'Android permission declaration alone is not a website-facing API; a secure Capacitor bridge is not implemented'
     );
 }
 
@@ -388,27 +368,27 @@ capacitor.controls.navigationToolbar=
   cap(
     E,
     'capacitor-webview-navigation-toolbar',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 capacitor.controls.externalLinks=
   cap(
     E,
     'capacitor-bridge-webview-client-routing',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 capacitor.controls.downloadManager=
   cap(
     E,
     'android-download-manager',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 /* -------------------------------------------------
@@ -424,20 +404,16 @@ for(const id of [
   cordova.permissions[id]=
     cap(
       E,
-      'cordova-android-webview-foundation',
+      'cordova-system-webview-runtime',
       true,
       false,
-      'Android/WebView foundation exists but physical runtime verification is pending'
+      'Cordova SystemWebView runtime path compiles; physical runtime verification is pending'
     );
 }
 
 cordova.permissions.notification=
-  cap(
-    E,
-    'cordova-android-notification-foundation',
-    true,
-    false,
-    'Android notification permission wiring exists; complete Web Notification display behavior is still being added'
+  unsupported(
+    'Normal Web Notifications are not implemented for Cordova yet'
   );
 
 for(const id of [
@@ -449,12 +425,8 @@ for(const id of [
   'sensors'
 ]){
   cordova.permissions[id]=
-    cap(
-      E,
-      'cordova-android-permission-foundation',
-      true,
-      false,
-      'Android permission wiring exists; complete website-facing native effect is still being added'
+    unsupported(
+      'Android permission declaration alone is not a website-facing API; a secure Cordova bridge is not implemented'
     );
 }
 
@@ -476,27 +448,27 @@ cordova.controls.navigationToolbar=
   cap(
     E,
     'cordova-system-webview-navigation-toolbar',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 cordova.controls.externalLinks=
   cap(
     E,
     'cordova-system-webview-client-routing',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 cordova.controls.downloadManager=
   cap(
     E,
     'android-download-manager',
+    true,
     false,
-    false,
-    'Implementation exists; Android CI and physical runtime verification are pending'
+    'Android CI compile/build verification passed; physical runtime verification is pending'
   );
 
 /* Firefox WebExtensions are intentionally Gecko-only. */

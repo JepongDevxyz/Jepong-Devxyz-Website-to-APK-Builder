@@ -64,27 +64,31 @@ jobs:
         run: |
           mkdir -p builds
 
-          PERMISSIONS='["camera","microphone","notification","location","media","contacts","calendar","biometrics","files","bluetooth","sensors"]'
+          PERMISSIONS='[]'
 
           SIZE_OPTIMIZATION=false
           ABI_TARGET="universal"
 
           case "$ENGINE" in
             native)
-              CONTROLS='["pullRefresh","hideScrollbars","transparentNav","pinchZoom","disableCopy","blockAdsRedirects"]'
+              PERMISSIONS='["camera","microphone","location","files"]'
+              CONTROLS='["pullRefresh","hideScrollbars","transparentNav","pinchZoom","disableCopy","blockAdsRedirects","navigationToolbar","externalLinks","downloadManager"]'
               EXTENSIONS='[]'
               ;;
             gecko)
-              CONTROLS='["transparentNav"]'
+              PERMISSIONS='["camera","microphone","notification","location","files"]'
+              CONTROLS='["transparentNav","navigationToolbar","externalLinks","downloadManager"]'
               EXTENSIONS='["adguard","ghostery","privacyBadger","darkReader","ublock"]'
               SIZE_OPTIMIZATION=true
               ABI_TARGET="arm64-v8a"
               ;;
             capacitor)
+              PERMISSIONS='["camera","microphone","location","files"]'
               CONTROLS='["transparentNav","pinchZoom","navigationToolbar","externalLinks","downloadManager"]'
               EXTENSIONS='[]'
               ;;
             cordova)
+              PERMISSIONS='["camera","microphone","location","files"]'
               CONTROLS='["transparentNav","pinchZoom","navigationToolbar","externalLinks","downloadManager"]'
               EXTENSIONS='[]'
               ;;
