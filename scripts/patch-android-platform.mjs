@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig, workDir, brandedAsset, mkdir, write, javaString } from './common.mjs';
 import { patchAndroidVersionMetadata } from './android-version-metadata.mjs';
+import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
 
 const args=process.argv.slice(2);
 const value=k=>{const i=args.indexOf(k); return i>=0?args[i+1]:''};
@@ -1583,5 +1584,5 @@ function patchCapacitorSplashStyle(){
  fs.writeFileSync(styles,s);
 }
 
-patchManifest(); writeBranding(); writeOneSignalApplication(); writeActivity(); patchCapacitorSplashStyle();
+patchManifest(); writeBranding(); writeOneSignalApplication(); writeActivity(); patchCrossEngineBrowserUx(cfg,project); patchCapacitorSplashStyle();
 console.log(`Patched ${engine} Android platform for ${buildId}`);

@@ -5,6 +5,7 @@ import { writeNative } from './write-native.mjs';
 import { writeCapacitor } from './write-capacitor.mjs';
 import { writeCordova } from './write-cordova.mjs';
 import { patchGeckoStartup } from './patch-gecko-startup.mjs';
+import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
 
 const [,, cmd, ...args] = process.argv;
 const value = name => { const i=args.indexOf(`--${name}`); return i>=0 ? args[i+1] : null; };
@@ -19,8 +20,8 @@ if(cmd==='prepare') {
   console.log(JSON.stringify({ok:true, buildId, engine:cfg.engine, appName:cfg.appName}, null, 2));
 } else if(cmd==='generate') {
   const out=workDir(buildId); fs.rmSync(path.dirname(out),{recursive:true,force:true}); mkdir(out);
-  if(cfg.engine==='native') writeNative(cfg,out,false);
-  if(cfg.engine==='gecko') { writeNative(cfg,out,true); patchGeckoStartup(cfg,out); }
+  if(cfg.engine==='native') { writeNative(cfg,out,false); patchCrossEngineBrowserUx(cfg,out); }
+  if(cfg.engine==='gecko') { writeNative(cfg,out,true); patchGeckoStartup(cfg,out); patchCrossEngineBrowserUx(cfg,out); }
   if(cfg.engine==='capacitor') writeCapacitor(cfg,out);
   if(cfg.engine==='cordova') writeCordova(cfg,out);
   console.log(out);

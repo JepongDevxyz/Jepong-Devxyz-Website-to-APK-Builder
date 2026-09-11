@@ -249,7 +249,13 @@ const required=[
 
   'VISIBILITY_VISIBLE_NOTIFY_COMPLETED',
 
-  'manager.enqueue'
+  'manager.enqueue',
+
+  'applySystemSafeArea',
+  'navigationProgress',
+  'showNavigationProgress',
+  'finishNavigationProgress',
+  'setDecorFitsSystemWindows(false)'
 ];
 
 for(const token of required){

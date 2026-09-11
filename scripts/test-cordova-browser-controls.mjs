@@ -228,7 +228,13 @@ const required=[
   'CookieManager.getInstance().getCookie',
   'Environment.DIRECTORY_DOWNLOADS',
   'VISIBILITY_VISIBLE_NOTIFY_COMPLETED',
-  'manager.enqueue'
+  'manager.enqueue',
+
+  'applySystemSafeArea',
+  'navigationProgress',
+  'showNavigationProgress',
+  'finishNavigationProgress',
+  'setDecorFitsSystemWindows(false)'
 ];
 
 for(const token of required){
