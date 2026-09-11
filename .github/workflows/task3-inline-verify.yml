@@ -1,0 +1,20 @@
+name: Task 3 Inline Verify
+
+on:
+  push:
+    branches: [capability-verification-task3]
+
+permissions:
+  contents: read
+
+jobs:
+  native-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Native controls verification
+        run: node scripts/test-native-controls-verification.mjs
