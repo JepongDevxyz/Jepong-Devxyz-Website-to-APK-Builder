@@ -135,6 +135,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Strict WebView runtime download contract
+        run: node scripts/test-webview-runtime-download-contract.mjs
+
       - name: Capacitor browser-controls regression
         if: matrix.engine == 'capacitor'
         run: node scripts/test-capacitor-browser-controls.mjs
