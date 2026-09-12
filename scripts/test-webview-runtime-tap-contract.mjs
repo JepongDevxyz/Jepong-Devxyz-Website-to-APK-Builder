@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {patchWebViewRenderSynchronization} from './runtime/task4-webview-render-sync-wrapper.mjs';
 
 const source=fs.readFileSync(
   new URL('./runtime/webview-engine-controls-smoke-core.mjs',import.meta.url),
@@ -17,14 +18,15 @@ for(const brittle of ['await tapWeb(0.17);','await tapWeb(0.36);','await tapWeb(
   }
 }
 
-const reloadStart=source.indexOf("stage('toolbar-reload');");
-const externalStart=source.indexOf("stage('external-link');",reloadStart);
+const patched=patchWebViewRenderSynchronization(source);
+const reloadStart=patched.indexOf("stage('toolbar-reload');");
+const externalStart=patched.indexOf("stage('external-link');",reloadStart);
 
 if(reloadStart<0 || externalStart<0){
   throw new Error('WebView runtime smoke reload/external stages are missing');
 }
 
-const reloadBlock=source.slice(reloadStart,externalStart);
+const reloadBlock=patched.slice(reloadStart,externalStart);
 
 if(!reloadBlock.includes("requests.get('/state/home')")){
   throw new Error('WebView reload verification must snapshot the rendered home pageshow state');
@@ -32,6 +34,15 @@ if(!reloadBlock.includes("requests.get('/state/home')")){
 
 if(!reloadBlock.includes("await waitForRequest('/state/home'")){
   throw new Error('WebView reload verification must wait for rendered home before accessibility taps');
+}
+
+const entry=fs.readFileSync(
+  new URL('./runtime/webview-engine-controls-smoke.mjs',import.meta.url),
+  'utf8'
+);
+
+if(!entry.includes('runRenderSyncedWebViewSmoke')){
+  throw new Error('WebView runtime entrypoint must execute the render-synchronized smoke');
 }
 
 console.log('✓ WebView runtime smoke taps actual page controls after rendered reload');

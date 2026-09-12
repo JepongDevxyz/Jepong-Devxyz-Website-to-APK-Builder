@@ -1,6 +1,5 @@
-import { runPatchedSmoke } from './task4-download-smoke-wrapper.mjs';
+import {runRenderSyncedWebViewSmoke} from './task4-webview-render-sync-wrapper.mjs';
 
-runPatchedSmoke(
-  'webview',
+runRenderSyncedWebViewSmoke(
   new URL('./webview-engine-controls-smoke-core.mjs',import.meta.url)
 );
