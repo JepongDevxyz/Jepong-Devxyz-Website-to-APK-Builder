@@ -1,0 +1,95 @@
+name: Task 4 Gecko Verify
+
+on:
+  push:
+    branches: [capability-verification-task4]
+
+permissions:
+  contents: read
+
+jobs:
+  gecko-capabilities:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BUILD_ID: task4-gecko-controls
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Gecko Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-37.1" \
+            "build-tools;37.0.0" \
+            "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Gecko generator verification
+        run: node scripts/test-gecko-capability-verification.mjs
+
+      - name: Create representative Gecko configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds
+          cat > "builds/$BUILD_ID.json" <<'EOF'
+          {
+            "websiteUrl": "https://example.com",
+            "appName": "Gecko Controls Verification",
+            "packageName": "com.jepongdevxyz.geckocontrolsverify",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "engine": "gecko",
+            "renderMode": "default",
+            "orientation": "auto",
+            "permissions": ["notification","files"],
+            "controls": ["transparentNav","navigationToolbar","externalLinks","downloadManager"],
+            "extensions": [],
+            "oneSignalAppId": "",
+            "offlineFallback": "Offline",
+            "iconDataUrl": "",
+            "splashDataUrl": "",
+            "splashEnabled": false,
+            "splashDuration": 0,
+            "apkSigner": false,
+            "sizeOptimization": false,
+            "abiTarget": "universal"
+          }
+          EOF
+          node scripts/build.mjs prepare --build-id "$BUILD_ID"
+          node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Build Gecko APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "work/$BUILD_ID/project"
+          gradle --no-daemon :app:assembleDebug --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Static Task 4 verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/test-capability-evidence-policy.mjs
+          node scripts/test-capability-truth.mjs
+          npm test
+          npm run check
