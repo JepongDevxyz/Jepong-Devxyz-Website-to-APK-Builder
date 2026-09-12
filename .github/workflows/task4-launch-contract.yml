@@ -15,4 +15,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: node scripts/test-task4-webview-launch-contract.mjs
+      - name: Launcher stabilization contract
+        run: node scripts/test-task4-webview-launch-contract.mjs
+      - name: Deterministic WebView startup integration
+        run: node scripts/test-webview-startup.mjs

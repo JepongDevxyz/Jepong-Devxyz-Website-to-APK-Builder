@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { patchWebViewStartupSource } from './patch-webview-startup.mjs';
 
 const capacitor=`class MainActivity {
@@ -51,6 +52,20 @@ if(!patchedCordova.includes('appView.loadUrl(HOME);')){
 }
 if(patchedCordova.indexOf('appView.loadUrl(HOME);')<patchedCordova.indexOf('installCordovaNavigationToolbar')){
   throw new Error('Cordova HOME load must happen after toolbar/client wiring');
+}
+
+const integrator=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
+const importNeedle="import { patchWebViewStartup } from './patch-webview-startup.mjs';";
+if(!integrator.includes(importNeedle)){
+  throw new Error('Android platform patcher must import deterministic WebView startup patch');
+}
+const uxCall=integrator.indexOf('patchCrossEngineBrowserUx(cfg,project)');
+const startupCall=integrator.indexOf('patchWebViewStartup(cfg,project)');
+if(uxCall<0 || startupCall<0){
+  throw new Error('Android platform patcher must execute deterministic WebView startup patch');
+}
+if(startupCall<uxCall){
+  throw new Error('WebView startup patch must run after cross-engine browser UX wiring');
 }
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');
