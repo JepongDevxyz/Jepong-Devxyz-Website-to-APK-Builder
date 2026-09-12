@@ -14,7 +14,7 @@ const run=async(...args)=>{
 };
 
 if(process.argv.includes('--print-cases')){
-  console.log(`Native controls emulator smoke:\n- deterministic local test page loads through 10.0.2.2\n- navigation toolbar is visible\n- back/forward/reload callbacks are exercised\n- external links route to ACTION_VIEW\n- downloads reach Android DownloadManager\n- zoom-enabled generated state is covered by source assertion plus live WebView launch\n- Back at home requires explicit exit confirmation`);
+  console.log(`Native controls emulator smoke:\n- deterministic local test page loads through 10.0.2.2\n- navigation toolbar is visible\n- page link plus native Back/Next/Home/Reload are exercised\n- external links route outside the app through ACTION_VIEW\n- downloads request the deterministic attachment through Android DownloadManager\n- zoom-enabled generated state is covered by source assertion plus live WebView launch\n- Back at home requires explicit exit confirmation`);
   process.exit(0);
 }
 
@@ -52,27 +52,96 @@ async function dumpUi(){
   return run('shell','cat','/sdcard/task3-window.xml');
 }
 
+async function waitForUi(text,timeout=5000){
+  const started=Date.now();
+  while(Date.now()-started<timeout){
+    const ui=await dumpUi();
+    if(ui.includes(`text="${text}"`) || ui.includes(text)) return ui;
+    await sleep(250);
+  }
+  throw new Error(`UI text did not appear: ${text}`);
+}
+
+function boundsForText(ui,text){
+  const escaped=text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const node=new RegExp(`<node[^>]*text="${escaped}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*/?>`).exec(ui)
+    || new RegExp(`<node[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*text="${escaped}"[^>]*/?>`).exec(ui);
+  if(!node) throw new Error(`Could not locate tappable UI text: ${text}`);
+  return node.slice(1,5).map(Number);
+}
+
+async function tapText(text){
+  const ui=await waitForUi(text);
+  const [x1,y1,x2,y2]=boundsForText(ui,text);
+  await run('shell','input','tap',String(Math.round((x1+x2)/2)),String(Math.round((y1+y2)/2)));
+  await sleep(500);
+}
+
+async function waitForRequest(pathname,minCount,timeout=5000){
+  const started=Date.now();
+  while(Date.now()-started<timeout){
+    if((requests.get(pathname)||0)>=minCount) return;
+    await sleep(100);
+  }
+  throw new Error(`HTTP request did not occur: ${pathname} x${minCount}`);
+}
+
+async function foregroundDump(){
+  return run('shell','dumpsys','activity','activities');
+}
+
 try{
   await run('install','-r',apk);
   await run('shell','am','force-stop',pkg);
   await run('shell','am','start','-W','-n',activity);
-  await sleep(2500);
+  await waitForRequest('/index.html',1);
+  await sleep(1000);
 
-  if((requests.get('/index.html')||0)<1){
-    throw new Error('deterministic Native controls test page was not requested');
-  }
-
-  const top=await run('shell','dumpsys','activity','activities');
+  const top=await foregroundDump();
   if(!top.includes(pkg)) throw new Error('Native controls app did not reach foreground/activity stack');
 
   const ui=await dumpUi();
   for(const label of ['Back','Next','Home','Reload','Share']){
     if(!ui.includes(`text="${label}"`)) throw new Error(`Native navigation toolbar missing at runtime: ${label}`);
   }
+  if(!ui.includes('TASK3_HOME')) throw new Error('deterministic Native home marker missing at runtime');
 
+  await tapText('NEXT_PAGE');
+  await waitForRequest('/page2.html',1);
+  await waitForUi('TASK3_PAGE_2');
+
+  await tapText('Back');
+  await waitForUi('TASK3_HOME');
+
+  await tapText('Next');
+  await waitForUi('TASK3_PAGE_2');
+
+  await tapText('Home');
+  await waitForUi('TASK3_HOME');
+
+  const beforeReload=requests.get('/index.html')||0;
+  await tapText('Reload');
+  await waitForRequest('/index.html',beforeReload+1);
+  await waitForUi('TASK3_HOME');
+
+  await tapText('EXTERNAL_LINK');
+  await sleep(750);
+  const externalTop=await foregroundDump();
+  if(externalTop.includes(`mResumedActivity: ActivityRecord`) && externalTop.includes(`${pkg}/.MainActivity`)){
+    throw new Error('Native external link remained in the app instead of routing through ACTION_VIEW');
+  }
   await run('shell','input','keyevent','4');
   await sleep(500);
-  const afterBack=await run('shell','dumpsys','activity','activities');
+  const returnedTop=await foregroundDump();
+  if(!returnedTop.includes(pkg)) throw new Error('Native app did not resume after external-link test');
+  await waitForUi('TASK3_HOME');
+
+  await tapText('DOWNLOAD_FILE');
+  await waitForRequest('/download.bin',1);
+
+  await run('shell','input','keyevent','4');
+  await waitForUi('Cancel');
+  const afterBack=await foregroundDump();
   const confirmUi=await dumpUi();
   if(!afterBack.includes(pkg) || !confirmUi.includes('text="Cancel"') || !confirmUi.includes('text="Exit"')){
     throw new Error('Native home Back does not require explicit exit confirmation');
@@ -84,7 +153,7 @@ try{
     throw new Error('Native controls app crashed during deterministic emulator smoke');
   }
 
-  console.log('✓ native controls deterministic launch/toolbar/exit smoke');
+  console.log('✓ native controls deterministic navigation/external/download/exit smoke');
 } finally {
   await new Promise(resolve=>server.close(resolve));
 }
