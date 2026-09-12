@@ -49,11 +49,7 @@ const server=http.createServer((req,res)=>{
     return;
   }
   if(url.pathname==='/download.bin'){
-    res.writeHead(200,{
-      'content-type':'application/octet-stream',
-      'content-disposition':'attachment; filename="task3-download.bin"',
-      'cache-control':'no-store'
-    });
+    res.writeHead(200,{'content-type':'application/octet-stream','content-disposition':'attachment; filename="task3-download.bin"','cache-control':'no-store'});
     res.end('task3-download');
     return;
   }
@@ -61,10 +57,7 @@ const server=http.createServer((req,res)=>{
   res.end(homePage);
 });
 
-await new Promise((resolve,reject)=>{
-  server.once('error',reject);
-  server.listen(8765,'0.0.0.0',resolve);
-});
+await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8765,'0.0.0.0',resolve);});
 stage('http-server-ready');
 
 async function dumpUi(timeout=8000){
@@ -78,9 +71,7 @@ async function dumpUi(timeout=8000){
       const ui=await run('shell','cat',path);
       if(ui.includes('<hierarchy')) return ui;
       lastError=`invalid UI dump: ${ui.slice(0,160)}`;
-    }catch(error){
-      lastError=error?.message||String(error);
-    }
+    }catch(error){lastError=error?.message||String(error);}
     await sleep(350);
   }
   throw new Error(`UI dump unavailable after retries: ${lastError}`);
@@ -94,9 +85,7 @@ async function waitForUi(text,timeout=5000){
       const ui=await dumpUi(Math.min(3000,Math.max(800,timeout-(Date.now()-started))));
       last=ui;
       if(ui.includes(`text="${text}"`) || ui.includes(text)) return ui;
-    }catch(error){
-      last=error?.message||String(error);
-    }
+    }catch(error){last=error?.message||String(error);}
     await sleep(250);
   }
   throw new Error(`UI text did not appear: ${text}; last=${String(last).slice(0,220)}`);
@@ -139,16 +128,8 @@ async function waitForRequest(pathname,minCount,timeout=7000){
   throw new Error(`HTTP request did not occur: ${pathname} x${minCount}; observed=${requests.get(pathname)||0}`);
 }
 
-async function foregroundDump(){
-  return run('shell','dumpsys','activity','activities');
-}
-
-function resumedActivityLine(dump){
-  return String(dump||'')
-    .split('\n')
-    .find(line=>/ResumedActivity|topResumedActivity/i.test(line) && /ActivityRecord/i.test(line))
-    || '';
-}
+async function foregroundDump(){return run('shell','dumpsys','activity','activities');}
+function resumedActivityLine(dump){return String(dump||'').split('\n').find(line=>/ResumedActivity|topResumedActivity/i.test(line) && /ActivityRecord/i.test(line))||'';}
 
 try{
   stage('install');
@@ -162,11 +143,8 @@ try{
   stage('initial-foreground-and-toolbar');
   const top=await foregroundDump();
   if(!top.includes(pkg)) throw new Error('Native controls app did not reach foreground/activity stack');
-
   const ui=await waitForUi('Back',10000);
-  for(const label of ['Back','Next','Home','Reload','Share']){
-    if(!ui.includes(`text="${label}"`)) throw new Error(`Native navigation toolbar missing at runtime: ${label}`);
-  }
+  for(const label of ['Back','Next','Home','Reload','Share']) if(!ui.includes(`text="${label}"`)) throw new Error(`Native navigation toolbar missing at runtime: ${label}`);
 
   stage('navigate-page2');
   const beforePage2=requests.get('/state/page2')||0;
@@ -203,19 +181,15 @@ try{
   stage('external-link');
   await tapWeb(0.46);
   await sleep(750);
-  const externalTop=await foregroundDump();
-  const externalResumed=resumedActivityLine(externalTop);
+  const externalResumed=resumedActivityLine(await foregroundDump());
   console.log(`[smoke] external-resumed ${externalResumed.trim()||'<none>'}`);
   if(!externalResumed) throw new Error('Could not determine resumed activity during external-link test');
-  if(externalResumed.includes(`${pkg}/.MainActivity`)){
-    throw new Error('Native external link remained in the app instead of routing through ACTION_VIEW');
-  }
+  if(externalResumed.includes(`${pkg}/.MainActivity`)) throw new Error('Native external link remained in the app instead of routing through ACTION_VIEW');
 
   stage('resume-after-external-link');
   await run('shell','am','start','-W','-n',activity);
   await sleep(500);
-  const returnedTop=await foregroundDump();
-  const returnedResumed=resumedActivityLine(returnedTop);
+  const returnedResumed=resumedActivityLine(await foregroundDump());
   console.log(`[smoke] external-returned ${returnedResumed.trim()||'<none>'}`);
   if(!returnedResumed.includes(`${pkg}/.MainActivity`)) throw new Error('Native app did not resume after deterministic return from external-link test');
   await waitForUi('Back',5000);
@@ -225,22 +199,24 @@ try{
   await tapWeb(0.66);
   await waitForRequest('/download.bin',beforeDownload+1);
 
-  stage('exit-confirmation');
+  stage('exit-confirmation-diagnostic');
+  const beforeExitHome=requests.get('/state/home')||0;
+  const beforeExitPage2=requests.get('/state/page2')||0;
+  console.log(`[smoke] exit-before home=${beforeExitHome} page2=${beforeExitPage2} resumed=${resumedActivityLine(await foregroundDump()).trim()||'<none>'}`);
   await run('shell','input','keyevent','4');
-  await waitForUi('Cancel');
-  const afterBack=await foregroundDump();
-  const confirmUi=await dumpUi();
-  if(!afterBack.includes(pkg) || !confirmUi.includes('text="Cancel"') || !confirmUi.includes('text="Exit"')){
-    throw new Error('Native home Back does not require explicit exit confirmation');
-  }
+  await sleep(1000);
+  const exitAfterHome=requests.get('/state/home')||0;
+  const exitAfterPage2=requests.get('/state/page2')||0;
+  const exitAfterResumed=resumedActivityLine(await foregroundDump());
+  const exitAfterUi=await dumpUi();
+  console.log(`[smoke] exit-after home=${exitAfterHome} page2=${exitAfterPage2} resumed=${exitAfterResumed.trim()||'<none>'} cancel=${exitAfterUi.includes('text="Cancel"')} exit=${exitAfterUi.includes('text="Exit"')}`);
+  if(!exitAfterUi.includes('text="Cancel"')) throw new Error(`Exit confirmation missing after Back; homeDelta=${exitAfterHome-beforeExitHome}; page2Delta=${exitAfterPage2-beforeExitPage2}`);
+  if(!exitAfterUi.includes('text="Exit"')) throw new Error('Exit confirmation missing Exit action');
 
   await run('shell','input','keyevent','4');
   stage('crash-check');
   const crashes=await run('logcat','-d','-t','300');
-  if(crashes.includes('FATAL EXCEPTION') && crashes.includes(pkg)){
-    throw new Error('Native controls app crashed during deterministic emulator smoke');
-  }
-
+  if(crashes.includes('FATAL EXCEPTION') && crashes.includes(pkg)) throw new Error('Native controls app crashed during deterministic emulator smoke');
   console.log('✓ native controls deterministic navigation/pull/external/download/exit smoke');
 } finally {
   stage('http-server-close-start');
