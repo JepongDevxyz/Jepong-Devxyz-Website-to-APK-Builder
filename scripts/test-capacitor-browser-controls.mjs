@@ -237,6 +237,9 @@ const required=[
   'web.canGoBack()',
   'web.canGoForward()',
 
+  'doUpdateVisitedHistory(WebViewview,Stringurl,booleanisReload)',
+  'super.doUpdateVisitedHistory(view,url,isReload)',
+
   'setDownloadListener',
   'startCapacitorDownload',
 
