@@ -241,7 +241,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: APK="$(find "$APK_DIR" -name '*.apk' | head -n 1)"; test -s "$APK"; node scripts/runtime/webview-engine-controls-smoke.mjs "$APK" "$PACKAGE_NAME" "$ENGINE"
+          script: |
+            adb shell am force-stop com.android.launcher3 || true
+            sleep 2
+            APK="$(find "$APK_DIR" -name '*.apk' | head -n 1)"; test -s "$APK"; node scripts/runtime/webview-engine-controls-smoke.mjs "$APK" "$PACKAGE_NAME" "$ENGINE"
 
   final-regression:
     name: Final remaining-engine regression
