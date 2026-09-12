@@ -94,7 +94,7 @@ jobs:
           gradle --no-daemon :app:assembleDebug --stacktrace
           test -s app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Strict Gecko API35 runtime diagnostic
+      - name: Gecko API35 runtime diagnostic
         id: runtime
         continue-on-error: true
         uses: ReactiveCircus/android-emulator-runner@v2
@@ -105,11 +105,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            set -o pipefail
             APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-            test -s "$APK"
-            node scripts/runtime/gecko-controls-smoke-core.mjs "$APK" 2>&1 | tee task4-gecko-runtime.log
-            rc=${PIPESTATUS[0]}
+            test -s "$APK" || exit 90
+            node scripts/runtime/gecko-controls-smoke-core.mjs "$APK" > task4-gecko-runtime.log 2>&1
+            rc=$?
+            cat task4-gecko-runtime.log
             {
               echo
               echo '=== downloads-directory ==='
@@ -123,10 +123,11 @@ jobs:
               echo
               echo '=== relevant logcat ==='
               adb logcat -d | grep -Ei 'DownloadManager|DownloadProvider|DownloadThread|task4-download|download.txt' | tail -300 || true
-            } | tee -a task4-gecko-runtime.log
+            } >> task4-gecko-runtime.log 2>&1
+            cat task4-gecko-runtime.log
             exit "$rc"
 
-      - name: Upload strict Gecko diagnostics
+      - name: Upload Gecko diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -135,7 +136,7 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Preserve strict runtime result
+      - name: Preserve runtime result
         if: steps.runtime.outcome != 'success'
         shell: bash
         run: exit 1
