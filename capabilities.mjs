@@ -73,8 +73,7 @@ function blankEngine(){
 
   for(const group of Object.keys(FEATURES)){
     for(const feature of FEATURES[group]){
-      out[group][feature.id]=
-        unsupported();
+      out[group][feature.id]=unsupported();
     }
   }
 
@@ -132,12 +131,7 @@ native.permissions.notification=
   );
 
 for(const id of [
-  'media',
-  'contacts',
-  'calendar',
-  'biometrics',
-  'bluetooth',
-  'sensors'
+  'media','contacts','calendar','biometrics','bluetooth','sensors'
 ]){
   native.permissions[id]=
     unsupported(
@@ -146,12 +140,7 @@ for(const id of [
 }
 
 for(const id of [
-  'pullRefresh',
-  'hideScrollbars',
-  'transparentNav',
-  'pinchZoom',
-  'disableCopy',
-  'blockAdsRedirects'
+  'pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects'
 ]){
   native.controls[id]=
     cap(
@@ -192,37 +181,16 @@ native.controls.downloadManager=
 
 /* -------------------------------------------------
    GeckoView
-   Camera, microphone and location have already been
-   physically tested. External-link routing was also
-   physically observed.
 -------------------------------------------------- */
 
 gecko.permissions.camera=
-  cap(
-    V,
-    'geckoview-permission-delegate',
-    true,
-    true,
-    'Physical-device camera runtime test passed'
-  );
+  cap(V,'geckoview-permission-delegate',true,true,'Physical-device camera runtime test passed');
 
 gecko.permissions.microphone=
-  cap(
-    V,
-    'geckoview-permission-delegate',
-    true,
-    true,
-    'Physical-device microphone runtime test passed'
-  );
+  cap(V,'geckoview-permission-delegate',true,true,'Physical-device microphone runtime test passed');
 
 gecko.permissions.location=
-  cap(
-    V,
-    'geckoview-content-permission',
-    true,
-    true,
-    'Physical-device Geolocation API runtime test passed'
-  );
+  cap(V,'geckoview-content-permission',true,true,'Physical-device Geolocation API runtime test passed');
 
 gecko.permissions.notification=
   cap(
@@ -230,7 +198,7 @@ gecko.permissions.notification=
     'geckoview-web-notification-delegate',
     true,
     false,
-    'GeckoView Web Notification delegate compiles successfully; physical runtime verification is pending'
+    'GeckoView Web Notification delegate compiles, but no secure-context Web Notification runtime proof exists yet; this is not Web Push verification'
   );
 
 gecko.permissions.files=
@@ -238,18 +206,11 @@ gecko.permissions.files=
     E,
     'geckoview-prompt-delegate-saf',
     true,
-    false,
-    'System file picker implementation compiles but physical runtime test is pending'
+    true,
+    'Android API 35 DocumentsUI picker and clean return passed, but physical-device verification remains required by policy'
   );
 
-for(const id of [
-  'media',
-  'contacts',
-  'calendar',
-  'biometrics',
-  'bluetooth',
-  'sensors'
-]){
+for(const id of ['media','contacts','calendar','biometrics','bluetooth','sensors']){
   gecko.permissions[id]=
     unsupported(
       'Android permission declaration alone is not a website-facing API; a secure Gecko bridge is not implemented'
@@ -258,20 +219,20 @@ for(const id of [
 
 gecko.controls.transparentNav=
   cap(
-    E,
+    V,
     'android-system-bars',
     true,
-    false,
-    'Generated implementation exists but dedicated runtime verification is pending'
+    true,
+    'Fresh Android API 35 runtime getter proof reported status=0 and navigation=0 for transparent system bars'
   );
 
 gecko.controls.navigationToolbar=
   cap(
-    E,
+    V,
     'geckoview-navigation-toolbar',
     true,
-    false,
-    'Toolbar renders on device but individual controls still require runtime verification'
+    true,
+    'Fresh Android API 35 runtime verified visible toolbar plus Back, Forward, Home and Refresh behavior'
   );
 
 gecko.controls.externalLinks=
@@ -280,45 +241,28 @@ gecko.controls.externalLinks=
     'geckoview-navigation-delegate',
     true,
     true,
-    'Off-site user-clicked link was physically observed opening in the Android browser'
+    'Off-site user-clicked link was physically observed opening in the Android browser and remains covered by API 35 regression'
   );
 
 gecko.controls.downloadManager=
   cap(
-    E,
+    V,
     'android-download-manager',
     true,
-    false,
-    'Download implementation compiles but physical runtime verification is pending'
+    true,
+    'Fresh Android API 35 runtime verified DownloadManager SUCCESS plus exact public Downloads path, 20-byte file and task4-gecko-download contents'
   );
 
-for(const id of [
-  'adguard',
-  'ghostery',
-  'privacyBadger',
-  'darkReader',
-  'ublock'
-]){
+for(const id of ['adguard','ghostery','privacyBadger','darkReader','ublock']){
   gecko.extensions[id]=
-    cap(
-      V,
-      'geckoview-webextension-controller',
-      true,
-      true,
-      'Physical-device extension runtime test passed'
-    );
+    cap(V,'geckoview-webextension-controller',true,true,'Physical-device extension runtime test passed');
 }
 
 /* -------------------------------------------------
    Capacitor
 -------------------------------------------------- */
 
-for(const id of [
-  'camera',
-  'microphone',
-  'location',
-  'files'
-]){
+for(const id of ['camera','microphone','location','files']){
   capacitor.permissions[id]=
     cap(
       E,
@@ -330,28 +274,16 @@ for(const id of [
 }
 
 capacitor.permissions.notification=
-  unsupported(
-    'Normal Web Notifications are not implemented for Capacitor yet'
-  );
+  unsupported('Normal Web Notifications are not implemented for Capacitor yet');
 
-for(const id of [
-  'media',
-  'contacts',
-  'calendar',
-  'biometrics',
-  'bluetooth',
-  'sensors'
-]){
+for(const id of ['media','contacts','calendar','biometrics','bluetooth','sensors']){
   capacitor.permissions[id]=
     unsupported(
       'Android permission declaration alone is not a website-facing API; a secure Capacitor bridge is not implemented'
     );
 }
 
-for(const id of [
-  'transparentNav',
-  'pinchZoom'
-]){
+for(const id of ['transparentNav','pinchZoom']){
   capacitor.controls[id]=
     cap(
       E,
@@ -363,42 +295,19 @@ for(const id of [
 }
 
 capacitor.controls.navigationToolbar=
-  cap(
-    E,
-    'capacitor-webview-navigation-toolbar',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'capacitor-webview-navigation-toolbar',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 capacitor.controls.externalLinks=
-  cap(
-    E,
-    'capacitor-bridge-webview-client-routing',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'capacitor-bridge-webview-client-routing',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 capacitor.controls.downloadManager=
-  cap(
-    E,
-    'android-download-manager',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'android-download-manager',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 /* -------------------------------------------------
    Cordova
 -------------------------------------------------- */
 
-for(const id of [
-  'camera',
-  'microphone',
-  'location',
-  'files'
-]){
+for(const id of ['camera','microphone','location','files']){
   cordova.permissions[id]=
     cap(
       E,
@@ -410,28 +319,16 @@ for(const id of [
 }
 
 cordova.permissions.notification=
-  unsupported(
-    'Normal Web Notifications are not implemented for Cordova yet'
-  );
+  unsupported('Normal Web Notifications are not implemented for Cordova yet');
 
-for(const id of [
-  'media',
-  'contacts',
-  'calendar',
-  'biometrics',
-  'bluetooth',
-  'sensors'
-]){
+for(const id of ['media','contacts','calendar','biometrics','bluetooth','sensors']){
   cordova.permissions[id]=
     unsupported(
       'Android permission declaration alone is not a website-facing API; a secure Cordova bridge is not implemented'
     );
 }
 
-for(const id of [
-  'transparentNav',
-  'pinchZoom'
-]){
+for(const id of ['transparentNav','pinchZoom']){
   cordova.controls[id]=
     cap(
       E,
@@ -443,48 +340,26 @@ for(const id of [
 }
 
 cordova.controls.navigationToolbar=
-  cap(
-    E,
-    'cordova-system-webview-navigation-toolbar',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'cordova-system-webview-navigation-toolbar',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 cordova.controls.externalLinks=
-  cap(
-    E,
-    'cordova-system-webview-client-routing',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'cordova-system-webview-client-routing',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 cordova.controls.downloadManager=
-  cap(
-    E,
-    'android-download-manager',
-    true,
-    false,
-    'Android CI compile/build verification passed; physical runtime verification is pending'
-  );
+  cap(E,'android-download-manager',true,false,'Android CI compile/build verification passed; physical runtime verification is pending');
 
 /* Firefox WebExtensions are intentionally Gecko-only. */
 for(const engine of [native,capacitor,cordova]){
   for(const feature of FEATURES.extensions){
     engine.extensions[feature.id]=
-      unsupported(
-        'Firefox WebExtension runtime is not available in this engine'
-      );
+      unsupported('Firefox WebExtension runtime is not available in this engine');
   }
 }
 
 /* AdGuard DNS needs a VPN/DNS layer and is not implemented. */
 for(const engine of [native,gecko,capacitor,cordova]){
   engine.controls.adguardDns=
-    unsupported(
-      'Requires a dedicated VPN/DNS layer that is not implemented'
-    );
+    unsupported('Requires a dedicated VPN/DNS layer that is not implemented');
 }
 
 export const ENGINE_CAPABILITIES=
@@ -495,83 +370,36 @@ export const ENGINE_CAPABILITIES=
     cordova:Object.freeze(cordova)
   });
 
-export function getCapability(
-  engine,
-  group,
-  id
-){
+export function getCapability(engine,group,id){
   return (
     ENGINE_CAPABILITIES?.[engine]?.[group]?.[id] ??
-    unsupported(
-      'Capability is not implemented for this engine'
-    )
+    unsupported('Capability is not implemented for this engine')
   );
 }
 
-export function getSelectableFeatureIds(
-  engine,
-  group
-){
-  const definitions=
-    FEATURES[group] ?? [];
-
+export function getSelectableFeatureIds(engine,group){
+  const definitions=FEATURES[group] ?? [];
   return definitions
-    .filter(
-      feature=>
-        getCapability(
-          engine,
-          group,
-          feature.id
-        ).status!==CAPABILITY_STATUS.UNSUPPORTED
-    )
-    .map(
-      feature=>feature.id
-    );
+    .filter(feature=>getCapability(engine,group,feature.id).status!==CAPABILITY_STATUS.UNSUPPORTED)
+    .map(feature=>feature.id);
 }
 
-export function validateCapabilitySelection(
-  config={}
-){
+export function validateCapabilitySelection(config={}){
   const errors=[];
 
-  for(const group of [
-    'permissions',
-    'controls',
-    'extensions'
-  ]){
-    const selected=
-      Array.isArray(config[group])
-        ? config[group]
-        : [];
-
-    const known=
-      new Set(
-        (FEATURES[group] ?? [])
-          .map(feature=>feature.id)
-      );
+  for(const group of ['permissions','controls','extensions']){
+    const selected=Array.isArray(config[group]) ? config[group] : [];
+    const known=new Set((FEATURES[group] ?? []).map(feature=>feature.id));
 
     for(const id of selected){
       if(!known.has(id)){
-        errors.push(
-          `Unknown ${group} capability: ${id}`
-        );
+        errors.push(`Unknown ${group} capability: ${id}`);
         continue;
       }
 
-      const capability=
-        getCapability(
-          config.engine,
-          group,
-          id
-        );
-
-      if(
-        capability.status===
-          CAPABILITY_STATUS.UNSUPPORTED
-      ){
-        errors.push(
-          `${id} is ${capability.status} on ${config.engine}: ${capability.reason}`
-        );
+      const capability=getCapability(config.engine,group,id);
+      if(capability.status===CAPABILITY_STATUS.UNSUPPORTED){
+        errors.push(`${id} is ${capability.status} on ${config.engine}: ${capability.reason}`);
       }
     }
   }
