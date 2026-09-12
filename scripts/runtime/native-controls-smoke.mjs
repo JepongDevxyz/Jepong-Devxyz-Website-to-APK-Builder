@@ -131,14 +131,56 @@ async function waitForRequest(pathname,minCount,timeout=7000){
 async function foregroundDump(){return run('shell','dumpsys','activity','activities');}
 function resumedActivityLine(dump){return String(dump||'').split('\n').find(line=>/ResumedActivity|topResumedActivity/i.test(line) && /ActivityRecord/i.test(line))||'';}
 
+async function diagnoseInitialLoad(){
+  stage('initial-load-diagnostics');
+  let tools='<unavailable>';
+  let tcp='<unavailable>';
+  let route='<unavailable>';
+  let resumed='<unavailable>';
+  let webview='<unavailable>';
+  let relevantLogs='<unavailable>';
+
+  try{
+    tools=(await run('shell','sh','-c','printf "curl="; command -v curl || true; printf "wget="; command -v wget || true; printf "toybox_nc="; toybox nc --help >/dev/null 2>&1; echo $?')).trim();
+  }catch(error){tools=error?.message||String(error);}
+  try{
+    tcp=(await run('shell','sh','-c','toybox nc -w 2 10.0.2.2 8765 </dev/null >/dev/null 2>&1; echo tcp_exit=$?')).trim();
+  }catch(error){tcp=error?.message||String(error);}
+  try{
+    route=(await run('shell','ip','route')).trim();
+  }catch(error){route=error?.message||String(error);}
+  try{
+    resumed=resumedActivityLine(await foregroundDump()).trim()||'<none>';
+  }catch(error){resumed=error?.message||String(error);}
+  try{
+    webview=(await run('shell','dumpsys','webviewupdate')).trim().split('\n').slice(0,30).join(' | ');
+  }catch(error){webview=error?.message||String(error);}
+  try{
+    const logs=await run('logcat','-d','-t','500');
+    relevantLogs=logs.split('\n').filter(line=>/chromium|webview|net::|ERR_|MainActivity|AndroidRuntime|cleartext/i.test(line)).slice(-120).join('\n')||'<no relevant log lines>';
+  }catch(error){relevantLogs=error?.message||String(error);}
+
+  console.log(`[smoke] initial-tools ${tools}`);
+  console.log(`[smoke] initial-tcp ${tcp}`);
+  console.log(`[smoke] initial-route ${route.replace(/\s+/g,' ')}`);
+  console.log(`[smoke] initial-resumed ${resumed}`);
+  console.log(`[smoke] initial-webview ${webview}`);
+  console.log(`[smoke] initial-logcat\n${relevantLogs}`);
+}
+
 try{
   stage('install');
   await run('install','-r',apk);
   stage('launch');
   await run('shell','am','force-stop',pkg);
   await run('shell','am','start','-W','-n',activity);
-  await waitForRequest('/index.html',1);
-  await waitForRequest('/state/home',1);
+  try{
+    await waitForRequest('/index.html',1);
+    await waitForRequest('/state/home',1);
+  }catch(error){
+    await diagnoseInitialLoad();
+    throw error;
+  }
 
   stage('initial-foreground-and-toolbar');
   const top=await foregroundDump();
