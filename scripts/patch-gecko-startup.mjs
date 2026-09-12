@@ -167,6 +167,69 @@ ${crashMarker}`,
     'website error state reset'
   );
 
+  const enqueueMarker=`  void enqueueDownload(
+    WebResponse response
+  ){`;
+
+  out=replaceOnce(
+    out,
+    enqueueMarker,
+    `  String responseHeader(
+    WebResponse response,
+    String name
+  ){
+    if(
+      response==null ||
+      response.headers==null ||
+      name==null
+    ){
+      return null;
+    }
+
+    String direct=
+      response.headers.get(name);
+
+    if(direct!=null){
+      return direct;
+    }
+
+    for(Map.Entry<String,String> entry:
+      response.headers.entrySet()
+    ){
+      if(
+        entry.getKey()!=null &&
+        entry.getKey().equalsIgnoreCase(name)
+      ){
+        return entry.getValue();
+      }
+    }
+
+    return null;
+  }
+
+${enqueueMarker}`,
+    'case-insensitive response header helper'
+  );
+
+  out=replaceOnce(
+    out,
+    `      String disposition=
+        response.headers.get(
+          "content-disposition"
+        );
+
+      String mime=
+        response.headers.get(
+          "content-type"
+        );`,
+    `      String disposition=
+        responseHeader(response, "content-disposition");
+
+      String mime=
+        responseHeader(response, "content-type");`,
+    'download response header lookup'
+  );
+
   return out;
 }
 
