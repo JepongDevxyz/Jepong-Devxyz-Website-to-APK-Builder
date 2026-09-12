@@ -2,13 +2,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { writeNative } from './write-native.mjs';
+import { patchNativeExitConfirmation } from './patch-native-exit-confirmation.mjs';
 import { getCapabilityEvidence } from '../verification/capability-verification.mjs';
 
 const out=path.join(os.tmpdir(),'jepong-native-controls-verification');
 fs.rmSync(out,{recursive:true,force:true});
 
 const controls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy','blockAdsRedirects','navigationToolbar','externalLinks','downloadManager'];
-writeNative({websiteUrl:'https://example.com',appName:'Native Controls Test',packageName:'com.jepongdevxyz.nativecontrolstest',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:[],controls,extensions:[],oneSignalAppId:'',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:false,splashDuration:0,sizeOptimization:false,abiTarget:'universal'},out,false);
+const cfg={websiteUrl:'https://example.com',appName:'Native Controls Test',packageName:'com.jepongdevxyz.nativecontrolstest',versionName:'1.0.0',versionCode:1,engine:'native',renderMode:'default',orientation:'auto',permissions:[],controls,extensions:[],oneSignalAppId:'',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:false,splashDuration:0,sizeOptimization:false,abiTarget:'universal'};
+writeNative(cfg,out,false);
+patchNativeExitConfirmation(cfg,out);
 
 const main=fs.readFileSync(path.join(out,'app/src/main/java/com/jepongdevxyz/nativecontrolstest/MainActivity.java'),'utf8');
 const required=[
