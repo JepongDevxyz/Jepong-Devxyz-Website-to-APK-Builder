@@ -117,14 +117,17 @@ jobs:
             java: '21'
             gradle: '8.14.3'
             package: com.jepongdevxyz.capcontrolsverify
+            apk_dir: work/task4-capacitor-controls/project/android/app/build/outputs/apk/debug
           - engine: cordova
             java: '17'
             gradle: '8.14.2'
             package: com.jepongdevxyz.cordovacontrolsverify
+            apk_dir: work/task4-cordova-controls/project/platforms/android/app/build/outputs/apk/debug
     env:
       ENGINE: ${{ matrix.engine }}
       BUILD_ID: task4-${{ matrix.engine }}-controls
       PACKAGE_NAME: ${{ matrix.package }}
+      APK_DIR: ${{ matrix.apk_dir }}
     steps:
       - uses: actions/checkout@v7
 
@@ -231,14 +234,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            if [ "$ENGINE" = "capacitor" ]; then
-              APK="$(find "work/$BUILD_ID/project/android/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-            else
-              APK="$(find "work/$BUILD_ID/project/platforms/android/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-            fi
-            test -s "$APK"
-            node scripts/runtime/webview-engine-controls-smoke.mjs "$APK" "$PACKAGE_NAME" "$ENGINE"
+          script: APK="$(find "$APK_DIR" -name '*.apk' | head -n 1)"; test -s "$APK"; node scripts/runtime/webview-engine-controls-smoke.mjs "$APK" "$PACKAGE_NAME" "$ENGINE"
 
   final-regression:
     name: Final remaining-engine regression
