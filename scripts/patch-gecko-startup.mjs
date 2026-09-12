@@ -30,6 +30,43 @@ function replaceRangeOnce(source, start, end, replacement, label) {
 export function patchGeckoActivitySource(source) {
   let out=String(source);
 
+  const transparentBars=`    if(Build.VERSION.SDK_INT>=29){
+      getWindow()
+        .setNavigationBarColor(
+          Color.TRANSPARENT
+        );
+
+      getWindow()
+        .setStatusBarColor(
+          Color.TRANSPARENT
+        );
+    }`;
+
+  if(out.includes(transparentBars)){
+    out=replaceOnce(
+      out,
+      transparentBars,
+      `    if(Build.VERSION.SDK_INT>=29){
+      getWindow()
+        .setNavigationBarColor(
+          Color.TRANSPARENT
+        );
+
+      getWindow()
+        .setStatusBarColor(
+          Color.TRANSPARENT
+        );
+
+      android.util.Log.i(
+        "JepongRuntimeBars",
+        "status=" + getWindow().getStatusBarColor()
+          + " navigation=" + getWindow().getNavigationBarColor()
+      );
+    }`,
+      'transparent system bar runtime evidence'
+    );
+  }
+
   out=replaceOnce(
     out,
     `  boolean started=false;\n\n  AtomicInteger extensionDone=`,

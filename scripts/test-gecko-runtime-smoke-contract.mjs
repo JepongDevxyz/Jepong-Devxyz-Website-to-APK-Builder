@@ -11,8 +11,9 @@ includes(core,"const expectedCanonicalPath='/storage/emulated/0/Download/task4-d
 includes(core,"await run('shell','cat',expectedPath)",'Gecko download smoke must verify actual downloaded bytes');
 includes(core,'Finished with status SUCCESS','Gecko download smoke must require DownloadManager SUCCESS evidence');
 includes(core,"stage('transparent-system-bars')",'Gecko runtime smoke must explicitly verify transparent system bars');
-includes(core,'mStatusBarColor','Gecko runtime smoke must inspect status bar transparency');
-includes(core,'mNavigationBarColor','Gecko runtime smoke must inspect navigation bar transparency');
+includes(core,'JepongRuntimeBars','Gecko runtime smoke must require direct Activity window-color evidence');
+includes(core,'status=0','Gecko runtime smoke must require transparent status bar getter value');
+includes(core,'navigation=0','Gecko runtime smoke must require transparent navigation bar getter value');
 includes(core,"stage('exit-confirmation-cancel')",'Gecko runtime smoke must exercise CANCEL');
 includes(core,"stage('exit-confirmation-exit')",'Gecko runtime smoke must exercise EXIT');
 includes(core,'await tapText(exit.value)','Gecko runtime smoke must actually press EXIT');

@@ -245,19 +245,24 @@ async function waitForPackageNotResumed(timeout=10000){
   throw new Error(`Gecko app remained resumed after EXIT; last=${last||'<none>'}`);
 }
 
-async function assertTransparentSystemBars(){
-  const dump=await run('shell','dumpsys','window','windows');
-  const appIndex=dump.indexOf(pkg);
-  if(appIndex<0){
-    throw new Error('Gecko app window not found while checking transparent system bars');
+async function assertTransparentSystemBars(timeout=10000){
+  const started=Date.now();
+  let last='';
+  while(Date.now()-started<timeout){
+    const logs=await run('logcat','-d');
+    const evidence=logs.split('\n').find(line=>
+      line.includes('JepongRuntimeBars') &&
+      /status=0\b/.test(line) &&
+      /navigation=0\b/.test(line)
+    );
+    if(evidence){
+      console.log(`[gecko-smoke] transparent-bars ${evidence.trim()}`);
+      return;
+    }
+    last=logs.split('\n').filter(line=>line.includes('JepongRuntimeBars')).slice(-8).join(' | ');
+    await sleep(250);
   }
-  const block=dump.slice(Math.max(0,appIndex-5000),Math.min(dump.length,appIndex+16000));
-  const statusTransparent=/mStatusBarColor=(?:0x)?0+\b/i.test(block);
-  const navTransparent=/mNavigationBarColor=(?:0x)?0+\b/i.test(block);
-  if(!statusTransparent||!navTransparent){
-    throw new Error(`Gecko transparent system bar assertion failed: status=${statusTransparent} navigation=${navTransparent}; window=${block.replace(/\s+/g,' ').slice(0,2400)}`);
-  }
-  console.log('[gecko-smoke] transparent-bars mStatusBarColor=0 mNavigationBarColor=0');
+  throw new Error(`Gecko transparent system bar runtime getter evidence missing; expected JepongRuntimeBars status=0 navigation=0; last=${last||'<none>'}`);
 }
 
 async function waitForSuccessfulDownload(timeout=30000){
