@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { writeNative } from './write-native.mjs';
-import { patchNativeExitConfirmation } from './patch-native-exit-confirmation.mjs';
 import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
 import { getCapabilityEvidence } from '../verification/capability-verification.mjs';
 
@@ -13,7 +12,6 @@ const controls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','dis
 const cfg={websiteUrl:'https://example.com',appName:'Native Controls Test',packageName:'com.jepongdevxyz.nativecontrolstest',versionName:'1.0.0',versionCode:1,engine:'native',renderMode:'default',orientation:'auto',permissions:[],controls,extensions:[],oneSignalAppId:'',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:false,splashDuration:0,sizeOptimization:false,abiTarget:'universal'};
 writeNative(cfg,out,false);
 patchCrossEngineBrowserUx(cfg,out);
-patchNativeExitConfirmation(cfg,out);
 
 const main=fs.readFileSync(path.join(out,'app/src/main/java/com/jepongdevxyz/nativecontrolstest/MainActivity.java'),'utf8');
 const required=[
@@ -30,8 +28,13 @@ const required=[
   'setDownloadListener',
   'startNativeDownload(',
   'showExitConfirmation()',
-  'setPositiveButton("Exit"',
-  'setNegativeButton("Cancel"'
+  'showPoweredByToast()',
+  'installBackHandler()',
+  'handleAppBack()',
+  'setPositiveButton(',
+  '"Exit"',
+  'setNegativeButton(',
+  '"Cancel"'
 ];
 for(const token of required){
   if(!main.includes(token)) throw new Error(`native control behavior missing: ${token}`);
