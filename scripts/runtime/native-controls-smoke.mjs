@@ -202,7 +202,8 @@ try{
   stage('reset-root-for-exit-confirmation');
   const beforeExitRoot=requests.get('/index.html')||0;
   const beforeExitHome=requests.get('/state/home')||0;
-  await run('shell','am','force-stop',pkg);
+  const clearResult=await run('shell','pm','clear',pkg);
+  if(!clearResult.includes('Success')) throw new Error(`Unable to clear Native app state before exit test: ${clearResult}`);
   await run('shell','am','start','-W','-n',activity);
   await waitForRequest('/index.html',beforeExitRoot+1);
   await waitForRequest('/state/home',beforeExitHome+1);
