@@ -44,7 +44,7 @@ if(process.argv.includes('--print-cases')){
     '- Gecko navigation history is exercised',
     '- external user links route outside the app',
     '- file input launches Android DocumentsUI',
-    '- attachment is re-requested by Android DownloadManager and written to Downloads',
+    '- Android DownloadManager reports the attachment successfully completed in Downloads',
     '- Back at clean home requires explicit exit confirmation',
     '- runtime is checked for app fatal exceptions'
   ].join('\n'));
@@ -342,24 +342,47 @@ async function waitForResumed(predicate,timeout=10000){
   );
 }
 
-async function waitForDownloadFile(timeout=15000){
+async function waitForSuccessfulDownload(timeout=20000){
+  const expectedUrl='http://10.0.2.2:8765/download.txt';
+  const expectedName='task4-download.txt';
+  const expectedBytes=Buffer.byteLength('task4-gecko-download');
+  const expectedUri=`file:///storage/emulated/0/Download/${expectedName}`;
   const started=Date.now();
+  let last='';
 
   while(Date.now()-started<timeout){
     try{
-      const output=await run(
-        'shell','sh','-c',
-        'ls -l /sdcard/Download/task4-download.txt 2>/dev/null || true'
+      last=await run(
+        'shell','content','query',
+        '--uri','content://downloads/my_downloads'
       );
-      if(output.includes('task4-download.txt')){
-        return output;
+      const row=String(last)
+        .split('\n')
+        .find(line=>line.includes(`uri=${expectedUrl}`));
+
+      if(row){
+        const completed=
+          row.includes('status=200') &&
+          row.includes(`title=${expectedName}`) &&
+          row.includes(`total_bytes=${expectedBytes}`) &&
+          row.includes(`bytes_so_far=${expectedBytes}`) &&
+          (
+            row.includes(`local_uri=${expectedUri}`) ||
+            row.includes(`hint=${expectedUri}`)
+          );
+
+        if(completed){
+          return row;
+        }
       }
-    }catch{}
+    }catch(error){
+      last=error?.message||String(error);
+    }
     await sleep(300);
   }
 
   throw new Error(
-    'Android DownloadManager did not create /sdcard/Download/task4-download.txt'
+    `Android DownloadManager did not report successful completion for ${expectedName}; last=${String(last).replace(/\s+/g,' ').slice(0,1600)}`
   );
 }
 
@@ -499,8 +522,8 @@ try{
     beforeDownload+2,
     20000
   );
-  const downloadFile=await waitForDownloadFile(20000);
-  console.log(`[gecko-smoke] downloaded ${downloadFile.trim()}`);
+  const downloadRow=await waitForSuccessfulDownload(20000);
+  console.log(`[gecko-smoke] download-provider-success ${downloadRow.replace(/\s+/g,' ').trim()}`);
 
   stage('reset-root-for-exit');
   const beforeRoot=requests.get('/index.html')||0;
