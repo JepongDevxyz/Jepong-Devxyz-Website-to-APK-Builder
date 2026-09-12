@@ -54,8 +54,8 @@ const geckoVerifier=`async function waitForSuccessfulDownload(timeout=60000){
 
 const webviewVerifier=`async function waitForSuccessfulDownload(timeout=60000){
   const expectedBody=downloadBody;
-  const expectedPath=\`/sdcard/Download/task4-\${engine}.txt\`;
-  const expectedCanonicalPath=\`/storage/emulated/0/Download/task4-\${engine}.txt\`;
+  const expectedPath=\`/sdcard/Download/task4-\${engine}-download.txt\`;
+  const expectedCanonicalPath=\`/storage/emulated/0/Download/task4-\${engine}-download.txt\`;
   const expectedBytes=Buffer.byteLength(expectedBody);
   const started=Date.now();
   let last='';
