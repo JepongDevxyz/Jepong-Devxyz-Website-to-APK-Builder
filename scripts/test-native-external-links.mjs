@@ -101,7 +101,7 @@ const capability=
 
 if(
   capability.status!==
-    CAPABILITY_STATUS.EXPERIMENTAL
+    CAPABILITY_STATUS.VERIFIED
 ){
   throw new Error(
     `native external links capability status is ${capability.status}`
