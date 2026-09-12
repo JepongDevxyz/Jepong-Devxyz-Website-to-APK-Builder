@@ -7,6 +7,7 @@ import {
 import { patchWebViewStartup } from './patch-webview-startup.mjs';
 import { patchCordovaAppCompatTheme } from './patch-cordova-appcompat-theme.mjs';
 import { patchCordovaToolbarLayout } from './patch-cordova-toolbar-layout.mjs';
+import { patchCordovaExternalSchemes } from './patch-cordova-external-schemes.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
@@ -77,6 +78,7 @@ function patchCapacitorVisitedHistory(cfg,projectDir){
 
 export function patchCrossEngineBrowserUx(cfg,projectDir){
   const activityPath=patchCoreBrowserUx(cfg,projectDir);
+  patchCordovaExternalSchemes(cfg,projectDir);
   patchCordovaAppCompatTheme(cfg,projectDir);
   patchCordovaToolbarLayout(cfg,projectDir);
   patchWebViewStartup(cfg,projectDir);
