@@ -104,8 +104,8 @@ jobs:
                   '  public void onBackPressed(){\n    android.util.Log.d("JepongBack","onBackPressed");\n    handleAppBack();\n'
               ),
               (
-                  '    web.setOnLongClickListener(v->true);\n',
-                  '    web.setOnLongClickListener(v->{ android.util.Log.d("JepongControls","disableCopyConsumed"); return true; });\n'
+                  'web.setOnLongClickListener(v->true);',
+                  'web.setOnLongClickListener(v->{ android.util.Log.d("JepongControls","disableCopyConsumed"); return true; });'
               ),
               (
                   '    web.setWebViewClient(new WebViewClient(){\n',
