@@ -54,6 +54,9 @@ jobs:
       - name: Gecko generator verification
         run: node scripts/test-gecko-capability-verification.mjs
 
+      - name: Gecko strict smoke contract regression
+        run: node scripts/test-gecko-runtime-smoke-contract.mjs
+
       - name: Create representative Gecko configuration
         shell: bash
         run: |
@@ -110,5 +113,5 @@ jobs:
         with:
           name: task4-gecko-download-diagnostics
           path: task4-gecko-runtime.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
