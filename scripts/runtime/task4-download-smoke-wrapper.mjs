@@ -115,11 +115,46 @@ const webviewLaunchDiagnostics=`  const launchResult=await adb('shell','am','sta
   }catch(error){
     console.log(\`[\${engine}-smoke] resolved-launcher unavailable: \${error?.message||error}\`);
   }
-  try{
-    const launchPid=(await adb('shell','pidof',pkg)).trim();
-    console.log(\`[\${engine}-smoke] pid-after-launch \${launchPid||'<none>'}\`);
-  }catch(error){
-    console.log(\`[\${engine}-smoke] pid-after-launch <none>\`);
+
+  let launchPid='';
+  for(let attempt=0;attempt<8;attempt++){
+    try{
+      launchPid=(await adb('shell','pidof',pkg)).trim();
+    }catch{}
+    if(launchPid) break;
+    await sleep(400);
+  }
+  console.log(\`[\${engine}-smoke] pid-after-launch \${launchPid||'<none>'}\`);
+
+  if(!launchPid){
+    try{
+      const earlyLogs=await adb('logcat','-d','-t','5000');
+      const relevantEarly=String(earlyLogs)
+        .split('\\n')
+        .filter(line=>
+          line.includes(pkg) ||
+          /AndroidRuntime|ActivityTaskManager|ActivityManager|JepongCordovaStartup|Cordova|InflateException|Resources\\$NotFoundException|ClassNotFoundException|NoClassDefFoundError|VerifyError|SecurityException|Process .* has died/i.test(line)
+        )
+        .slice(-700)
+        .join('\\n');
+      console.log(\`[\${engine}-smoke] launch-failure-logcat\\n\${relevantEarly||'<no relevant launch logs>'}\`);
+    }catch(error){
+      console.log(\`[\${engine}-smoke] launch-failure-logcat unavailable: \${error?.message||error}\`);
+    }
+
+    try{
+      const immediateActivities=await adb('shell','dumpsys','activity','activities');
+      const relevantActivities=String(immediateActivities)
+        .split('\\n')
+        .filter(line=>line.includes(pkg)||/ResumedActivity|topResumedActivity|mFocusedApp/i.test(line))
+        .slice(-120)
+        .join(' ');
+      console.log(\`[\${engine}-smoke] launch-failure-activities \${relevantActivities.replace(/\\s+/g,' ').trim()||'<none>'}\`);
+    }catch(error){
+      console.log(\`[\${engine}-smoke] launch-failure-activities unavailable: \${error?.message||error}\`);
+    }
+
+    throw new Error(\`\${engine} No app process after launch\`);
   }`;
 
 function patchVerifier(source,kind){
