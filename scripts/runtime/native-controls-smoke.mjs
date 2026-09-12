@@ -199,19 +199,22 @@ try{
   await tapWeb(0.66);
   await waitForRequest('/download.bin',beforeDownload+1);
 
-  stage('exit-confirmation-diagnostic');
+  stage('reset-root-for-exit-confirmation');
+  const beforeExitRoot=requests.get('/index.html')||0;
   const beforeExitHome=requests.get('/state/home')||0;
-  const beforeExitPage2=requests.get('/state/page2')||0;
-  console.log(`[smoke] exit-before home=${beforeExitHome} page2=${beforeExitPage2} resumed=${resumedActivityLine(await foregroundDump()).trim()||'<none>'}`);
+  await run('shell','am','force-stop',pkg);
+  await run('shell','am','start','-W','-n',activity);
+  await waitForRequest('/index.html',beforeExitRoot+1);
+  await waitForRequest('/state/home',beforeExitHome+1);
+  await waitForUi('Back',5000);
+
+  stage('exit-confirmation');
   await run('shell','input','keyevent','4');
-  await sleep(1000);
-  const exitAfterHome=requests.get('/state/home')||0;
-  const exitAfterPage2=requests.get('/state/page2')||0;
-  const exitAfterResumed=resumedActivityLine(await foregroundDump());
-  const exitAfterUi=await dumpUi();
-  console.log(`[smoke] exit-after home=${exitAfterHome} page2=${exitAfterPage2} resumed=${exitAfterResumed.trim()||'<none>'} cancel=${exitAfterUi.includes('text="Cancel"')} exit=${exitAfterUi.includes('text="Exit"')}`);
-  if(!exitAfterUi.includes('text="Cancel"')) throw new Error(`Exit confirmation missing after Back; homeDelta=${exitAfterHome-beforeExitHome}; page2Delta=${exitAfterPage2-beforeExitPage2}`);
-  if(!exitAfterUi.includes('text="Exit"')) throw new Error('Exit confirmation missing Exit action');
+  const confirmUi=await waitForUi('Cancel',5000);
+  const afterBack=await foregroundDump();
+  if(!afterBack.includes(pkg) || !confirmUi.includes('text="Cancel"') || !confirmUi.includes('text="Exit"')){
+    throw new Error('Native home Back does not require explicit exit confirmation from clean root history');
+  }
 
   await run('shell','input','keyevent','4');
   stage('crash-check');
