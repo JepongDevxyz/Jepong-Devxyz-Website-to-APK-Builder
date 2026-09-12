@@ -7,6 +7,14 @@ export function writeCordova(cfg, out) {
   write(path.join(out,'package.json'), JSON.stringify({ name:'jepong-generated-cordova',version:'1.0.0',private:true,devDependencies:{cordova:'13.0.0'} }, null, 2));
   const orientation = cfg.orientation === 'portrait' ? 'portrait' : cfg.orientation === 'landscape' ? 'landscape' : 'default';
   const splashDelay=cfg.splashEnabled===false?0:Math.max(0,Math.min(15000,Number(cfg.splashDuration)||1500));
+  const allowCleartext=/^http:\/\//i.test(String(cfg.websiteUrl||''));
+  const androidNamespace=allowCleartext?' xmlns:android="http://schemas.android.com/apk/res/android"':'';
+  const cleartextPolicy=allowCleartext?`
+  <platform name="android">
+    <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+      <application android:usesCleartextTraffic="true" />
+    </edit-config>
+  </platform>`:'';
   // Cordova's platform generator receives conservative PNG defaults; the selected compressed branding is applied in the native patch stage.
   write(path.join(out,'res/icon.png'),fs.readFileSync(path.join(ROOT,'assets/default-icon.png')));
   write(path.join(out,'res/screen/android/splash.png'),fs.readFileSync(path.join(ROOT,'assets/default-splash.png')));
@@ -14,7 +22,7 @@ export function writeCordova(cfg, out) {
   write(path.join(out,`branding/app_icon.${icon.ext}`),icon.buffer);
   write(path.join(out,`branding/app_splash.${splash.ext}`),splash.buffer);
   write(path.join(out,'config.xml'), `<?xml version="1.0" encoding="utf-8"?>
-<widget id="${escXml(cfg.packageName)}" version="${escXml(cfg.versionName)}" android-versionCode="${Number(cfg.versionCode)}" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="${escXml(cfg.packageName)}" version="${escXml(cfg.versionName)}" android-versionCode="${Number(cfg.versionCode)}" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0"${androidNamespace}>
   <name>${escXml(cfg.appName)}</name>
   <content src="${escXml(cfg.websiteUrl)}"/>
   <access origin="*"/>
@@ -32,7 +40,7 @@ export function writeCordova(cfg, out) {
   <preference name="SplashScreenDelay" value="${splashDelay}"/>
   <preference name="AutoHideSplashScreen" value="true"/>
   <preference name="SplashScreenBackgroundColor" value="#111827"/>
-  <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splash.png"/>
+  <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/screen/android/splash.png"/>${cleartextPolicy}
 </widget>`);
   write(path.join(out,'www/index.html'), `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escXml(cfg.appName)}</title><style>body{background:#111827;color:white;font-family:system-ui}</style><p>Loading…</p>`);
   write(path.join(out,'jepong-config.json'), JSON.stringify(cfg,null,2));
