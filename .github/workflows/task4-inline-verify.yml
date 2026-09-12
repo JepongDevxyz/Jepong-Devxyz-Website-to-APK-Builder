@@ -1,4 +1,4 @@
-name: Task 4 Gecko Verify
+name: Task 4 Remaining Engines Verify
 
 on:
   push:
@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   gecko-capabilities:
+    name: Gecko capability runtime
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -93,7 +94,7 @@ jobs:
           gradle --no-daemon :app:assembleDebug --stacktrace
           test -s app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Emulator runtime smoke
+      - name: Gecko API35 runtime smoke
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -104,11 +105,161 @@ jobs:
           script: |
             node scripts/runtime/gecko-controls-ci-smoke.mjs "$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
 
-      - name: Static Task 4 verification
+  webview-capabilities:
+    name: ${{ matrix.engine }} capability runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: capacitor
+            java: '21'
+            gradle: '8.14.3'
+            package: com.jepongdevxyz.capcontrolsverify
+          - engine: cordova
+            java: '17'
+            gradle: '8.14.2'
+            package: com.jepongdevxyz.cordovacontrolsverify
+    env:
+      ENGINE: ${{ matrix.engine }}
+      BUILD_ID: task4-${{ matrix.engine }}-controls
+      PACKAGE_NAME: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+
+      - name: Install Android SDK 36
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/test-capability-evidence-policy.mjs
-          node scripts/test-capability-truth.mjs
-          npm test
-          npm run check
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ matrix.gradle }}
+
+      - name: Create representative ${{ matrix.engine }} configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p builds
+          cat > "builds/$BUILD_ID.json" <<EOF
+          {
+            "websiteUrl": "http://10.0.2.2:8765/index.html",
+            "appName": "${ENGINE} Controls Verification",
+            "packageName": "$PACKAGE_NAME",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "engine": "$ENGINE",
+            "renderMode": "default",
+            "orientation": "auto",
+            "permissions": ["camera","microphone","location","files"],
+            "controls": ["transparentNav","pinchZoom","navigationToolbar","externalLinks","downloadManager"],
+            "extensions": [],
+            "oneSignalAppId": "",
+            "offlineFallback": "Offline",
+            "iconDataUrl": "",
+            "splashDataUrl": "",
+            "splashEnabled": false,
+            "splashDuration": 0,
+            "apkSigner": false,
+            "sizeOptimization": false,
+            "abiTarget": "universal"
+          }
+          EOF
+          node scripts/build.mjs prepare --build-id "$BUILD_ID"
+          node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Build and patch Capacitor APK
+        if: matrix.engine == 'capacitor'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cap add android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine capacitor
+          cd "work/$BUILD_ID/project/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build and patch Cordova APK
+        if: matrix.engine == 'cordova'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cordova platform add android@15.1.0
+          npx cordova prepare android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
+          cd "work/$BUILD_ID/project/platforms/android"
+          gradle --no-daemon assembleDebug --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: ${{ matrix.engine }} API35 runtime smoke
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            if [ "$ENGINE" = "capacitor" ]; then
+              APK="$(find "work/$BUILD_ID/project/android/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+            else
+              APK="$(find "work/$BUILD_ID/project/platforms/android/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+            fi
+            test -s "$APK"
+            node scripts/runtime/webview-engine-controls-smoke.mjs "$APK" "$PACKAGE_NAME" "$ENGINE"
+
+  final-regression:
+    name: Final remaining-engine regression
+    needs: [gecko-capabilities, webview-capabilities]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Capability evidence policy
+        run: node scripts/test-capability-evidence-policy.mjs
+
+      - name: Capability truth
+        run: node scripts/test-capability-truth.mjs
+
+      - name: Full generator regression
+        run: npm test
+
+      - name: Syntax and project checks
+        run: npm run check
