@@ -135,6 +135,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Deterministic WebView startup integration
+        run: node scripts/test-webview-startup.mjs
+
       - name: Strict WebView runtime download contract
         run: node scripts/test-webview-runtime-download-contract.mjs
 
