@@ -23,7 +23,10 @@ const required=[
   'shouldOpenExternally(u)',
   'openExternalUrl(u)',
   'setDownloadListener',
-  'startNativeDownload('
+  'startNativeDownload(',
+  'showExitConfirmation()',
+  'setPositiveButton("Exit"',
+  'setNegativeButton("Cancel"'
 ];
 for(const token of required){
   if(!main.includes(token)) throw new Error(`native control behavior missing: ${token}`);
