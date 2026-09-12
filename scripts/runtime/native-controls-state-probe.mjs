@@ -41,15 +41,15 @@ async function waitForHome(timeout=8000){
   throw new Error('Native state probe page did not load');
 }
 
-async function waitForControlState(timeout=8000){
+async function waitForControlLog(token,timeout=8000){
   const started=Date.now();
   let last='';
   while(Date.now()-started<timeout){
     last=await run('logcat','-d','-s','JepongControls:D','*:S');
-    if(last.includes('JepongControls')) return last;
+    if(last.includes(token)) return last;
     await sleep(250);
   }
-  throw new Error(`Native control-state log missing; last=${last.slice(-500)}`);
+  throw new Error(`Native control log missing ${token}; last=${last.slice(-700)}`);
 }
 
 async function screenSize(){
@@ -73,14 +73,14 @@ try{
   await run('shell','am','start','-W','-n',activity);
   await waitForHome();
 
-  const controlLog=await waitForControlState();
+  const controlLog=await waitForControlLog('JepongControls');
   const expected=[
     'vertical=false',
     'horizontal=false',
     'builtInZoom=true',
     'displayZoom=false',
     'supportZoom=true',
-    'longClickable=false',
+    'longClickable=true',
     'navColor=0',
     'statusColor=0'
   ];
@@ -91,13 +91,28 @@ try{
   }
   console.log(`[state-probe] control-state ${expected.join(' ')}`);
 
+  const {width,height}=await screenSize();
+
+  await run('logcat','-c');
+  console.log('[state-probe] disable-copy-long-press');
+  await run(
+    'shell','input','swipe',
+    String(Math.round(width*0.5)),String(Math.round(height*0.38)),
+    String(Math.round(width*0.5)),String(Math.round(height*0.38)),
+    '1200'
+  );
+  const longPressLog=await waitForControlLog('disableCopyConsumed',5000);
+  if(!longPressLog.includes('disableCopyConsumed')){
+    throw new Error(`Native disable-copy long press was not consumed: ${longPressLog.trim()}`);
+  }
+  console.log('[state-probe] disable-copy consumed long press');
+
   const before=await run('shell','dumpsys','activity','activities');
   const beforeLine=resumedActivityLine(before);
   if(!beforeLine.includes(`${pkg}/.MainActivity`)){
     throw new Error(`Native app not foreground before blocked redirect probe: ${beforeLine}`);
   }
 
-  const {width,height}=await screenSize();
   await run('shell','input','tap',String(Math.round(width*0.5)),String(Math.round(height*0.38)));
   await sleep(1000);
 
@@ -113,7 +128,7 @@ try{
     throw new Error('Native app crashed during direct control-state probe');
   }
 
-  console.log('✓ native scrollbars/transparent-bars/zoom/disable-copy-state/blocked-redirect runtime probe');
+  console.log('✓ native scrollbars/transparent-bars/zoom/disable-copy/blocked-redirect runtime probe');
 } finally {
   server.closeIdleConnections?.();
   server.closeAllConnections?.();
