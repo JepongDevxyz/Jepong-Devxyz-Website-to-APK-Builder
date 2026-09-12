@@ -25,3 +25,5 @@ jobs:
         run: node scripts/test-cordova-appcompat-theme.mjs
       - name: Cordova toolbar FrameLayout contract
         run: node scripts/test-cordova-toolbar-layout-contract.mjs
+      - name: WebView accessibility tap contract
+        run: node scripts/test-webview-runtime-tap-contract.mjs
