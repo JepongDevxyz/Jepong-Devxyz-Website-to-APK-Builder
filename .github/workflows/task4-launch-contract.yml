@@ -19,3 +19,5 @@ jobs:
         run: node scripts/test-task4-webview-launch-contract.mjs
       - name: Deterministic WebView startup integration
         run: node scripts/test-webview-startup.mjs
+      - name: Cordova HTTP cleartext policy
+        run: node scripts/test-cordova-cleartext-policy.mjs
