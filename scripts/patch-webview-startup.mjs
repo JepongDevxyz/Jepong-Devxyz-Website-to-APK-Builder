@@ -51,7 +51,7 @@ export function patchWebViewStartupSource(source,engine){
     out=replaceOnce(
       out,
       `    loadUrl(launchUrl);\n\n`,
-      '',
+      `    // Initialize Cordova without starting navigation yet.\n    // CordovaActivity.loadUrl(...) normally performs this init step.\n    init();\n\n`,
       'cordova premature launchUrl load'
     );
     out=replaceOnce(
