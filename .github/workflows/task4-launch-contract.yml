@@ -21,3 +21,5 @@ jobs:
         run: node scripts/test-webview-startup.mjs
       - name: Cordova HTTP cleartext policy
         run: node scripts/test-cordova-cleartext-policy.mjs
+      - name: Cordova AppCompat activity theme
+        run: node scripts/test-cordova-appcompat-theme.mjs
