@@ -13,7 +13,7 @@ export function patchNativeExitConfirmation(cfg,out){
   );
 
   let source=fs.readFileSync(file,'utf8');
-  const needle='  @Override public void onBackPressed(){ if(web!=null&&web.canGoBack()) web.goBack(); else super.onBackPressed(); }';
+  const oldBack='  @Override public void onBackPressed(){ if(web!=null&&web.canGoBack()) web.goBack(); else super.onBackPressed(); }';
   const replacement=`  void showExitConfirmation(){
     new AlertDialog.Builder(this)
       .setTitle("Exit app?")
@@ -24,14 +24,23 @@ export function patchNativeExitConfirmation(cfg,out){
   }
   @Override public void onBackPressed(){ if(web!=null&&web.canGoBack()) web.goBack(); else showExitConfirmation(); }`;
 
-  if(!source.includes(needle)){
-    throw new Error('Native exit confirmation patch marker missing');
+  if(source.includes('void showExitConfirmation()')){
+    throw new Error('Native exit confirmation already present');
   }
 
-  if(source.indexOf(needle)!==source.lastIndexOf(needle)){
-    throw new Error('Native exit confirmation patch marker ambiguous');
+  if(source.includes(oldBack)){
+    if(source.indexOf(oldBack)!==source.lastIndexOf(oldBack)){
+      throw new Error('Native exit confirmation raw back marker ambiguous');
+    }
+    source=source.replace(oldBack,replacement);
+  }else{
+    if(source.includes('onBackPressed()')){
+      throw new Error('Native exit confirmation found unexpected back-handler shape');
+    }
+    const classEnd=source.lastIndexOf('\n}');
+    if(classEnd<0) throw new Error('Native exit confirmation class end marker missing');
+    source=source.slice(0,classEnd)+'\n'+replacement+'\n'+source.slice(classEnd);
   }
 
-  source=source.replace(needle,replacement);
   fs.writeFileSync(file,source);
 }
