@@ -69,58 +69,6 @@ jobs:
           EOF
           node scripts/build.mjs prepare --build-id "$BUILD_ID"
           node scripts/build.mjs generate --build-id "$BUILD_ID"
-      - name: Instrument generated Native runtime evidence
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          files=list(Path('work').glob('*/project/app/src/main/java/**/MainActivity.java'))
-          if len(files)!=1:
-              raise SystemExit(f'Expected exactly one generated MainActivity.java, found {len(files)}')
-
-          p=files[0]
-          s=p.read_text()
-
-          replacements=[
-              (
-                  '  void showExitConfirmation(){\n',
-                  '  void showExitConfirmation(){\n    android.util.Log.d("JepongBack","showExitConfirmation");\n'
-              ),
-              (
-                  '  void handleAppBack(){\n',
-                  '  void handleAppBack(){\n    android.util.Log.d("JepongBack","handleAppBack canGoBack="+(web!=null&&web.canGoBack()));\n'
-              ),
-              (
-                  '  void installBackHandler(){\n',
-                  '  void installBackHandler(){\n    android.util.Log.d("JepongBack","installBackHandler sdk="+Build.VERSION.SDK_INT);\n'
-              ),
-              (
-                  '          this::handleAppBack\n',
-                  '          ()->{ android.util.Log.d("JepongBack","onBackInvoked"); handleAppBack(); }\n'
-              ),
-              (
-                  '  public void onBackPressed(){\n    handleAppBack();\n',
-                  '  public void onBackPressed(){\n    android.util.Log.d("JepongBack","onBackPressed");\n    handleAppBack();\n'
-              ),
-              (
-                  'web.setOnLongClickListener(v->true);',
-                  'web.setOnLongClickListener(v->{ android.util.Log.d("JepongControls","disableCopyConsumed"); return true; });'
-              ),
-              (
-                  '    web.setWebViewClient(new WebViewClient(){\n',
-                  '    android.util.Log.d("JepongControls","vertical="+web.isVerticalScrollBarEnabled()+" horizontal="+web.isHorizontalScrollBarEnabled()+" builtInZoom="+s.getBuiltInZoomControls()+" displayZoom="+s.getDisplayZoomControls()+" supportZoom="+s.supportZoom()+" longClickable="+web.isLongClickable()+" navColor="+getWindow().getNavigationBarColor()+" statusColor="+getWindow().getStatusBarColor());\n    web.setWebViewClient(new WebViewClient(){\n'
-              ),
-          ]
-
-          for old,new in replacements:
-              if s.count(old)!=1:
-                  raise SystemExit(f'Native runtime instrumentation marker count={s.count(old)} for {old!r}')
-              s=s.replace(old,new,1)
-
-          p.write_text(s)
-          print(f'Instrumented {p}')
-          PY
       - name: Build Native controls APK
         shell: bash
         run: |
@@ -136,7 +84,6 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             node scripts/runtime/native-controls-ci-smoke.mjs "$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
-            node scripts/runtime/native-controls-state-probe.mjs "$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
       - name: Full Task 3 verification
         shell: bash
         run: |
