@@ -54,18 +54,25 @@ if(patchedCordova.indexOf('appView.loadUrl(HOME);')<patchedCordova.indexOf('inst
   throw new Error('Cordova HOME load must happen after toolbar/client wiring');
 }
 
-const integrator=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
-const importNeedle="import { patchWebViewStartup } from './patch-webview-startup.mjs';";
-if(!integrator.includes(importNeedle)){
-  throw new Error('Android platform patcher must import deterministic WebView startup patch');
+const platformPatcher=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
+const uxWrapper=fs.readFileSync(new URL('./patch-cross-engine-browser-ux.mjs',import.meta.url),'utf8');
+
+if(!platformPatcher.includes("import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';")){
+  throw new Error('Android platform patcher must import the browser UX wrapper');
 }
-const uxCall=integrator.indexOf('patchCrossEngineBrowserUx(cfg,project)');
-const startupCall=integrator.indexOf('patchWebViewStartup(cfg,project)');
-if(uxCall<0 || startupCall<0){
-  throw new Error('Android platform patcher must execute deterministic WebView startup patch');
+if(!platformPatcher.includes('patchCrossEngineBrowserUx(cfg,project)')){
+  throw new Error('Android platform patcher must execute the browser UX wrapper');
 }
-if(startupCall<uxCall){
-  throw new Error('WebView startup patch must run after cross-engine browser UX wiring');
+if(!uxWrapper.includes("import { patchWebViewStartup } from './patch-webview-startup.mjs';")){
+  throw new Error('Browser UX wrapper must import deterministic WebView startup patch');
+}
+const coreCall=uxWrapper.indexOf('patchCoreBrowserUx(cfg,projectDir)');
+const startupCall=uxWrapper.indexOf('patchWebViewStartup(cfg,projectDir)');
+if(coreCall<0 || startupCall<0){
+  throw new Error('Browser UX wrapper must execute deterministic WebView startup patch');
+}
+if(startupCall<coreCall){
+  throw new Error('WebView startup patch must run after core browser UX wiring');
 }
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');
