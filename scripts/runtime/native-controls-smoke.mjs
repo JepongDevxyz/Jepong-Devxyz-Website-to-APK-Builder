@@ -210,12 +210,15 @@ try{
   if(externalResumed.includes(`${pkg}/.MainActivity`)){
     throw new Error('Native external link remained in the app instead of routing through ACTION_VIEW');
   }
-  await run('shell','input','keyevent','4');
+
+  stage('resume-after-external-link');
+  await run('shell','am','start','-W','-n',activity);
   await sleep(500);
   const returnedTop=await foregroundDump();
   const returnedResumed=resumedActivityLine(returnedTop);
   console.log(`[smoke] external-returned ${returnedResumed.trim()||'<none>'}`);
-  if(!returnedResumed.includes(`${pkg}/.MainActivity`)) throw new Error('Native app did not resume after external-link test');
+  if(!returnedResumed.includes(`${pkg}/.MainActivity`)) throw new Error('Native app did not resume after deterministic return from external-link test');
+  await waitForUi('Back',5000);
 
   stage('download');
   const beforeDownload=requests.get('/download.bin')||0;
