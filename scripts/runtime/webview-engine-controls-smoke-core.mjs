@@ -364,7 +364,7 @@ try{
 
   stage('navigate-page2');
   const beforePage2=requests.get('/state/page2')||0;
-  await tapWeb(0.17);
+  await tapText('NEXT_PAGE');
   await waitForRequest('/page2.html',1);
   await waitForRequest('/state/page2',beforePage2+1);
 
@@ -389,7 +389,7 @@ try{
   await waitForRequest('/index.html',beforeReload+1);
 
   stage('external-link');
-  await tapWeb(0.36);
+  await tapText('EXTERNAL_LINK');
   const external=await waitForResumed(
     line=>Boolean(line)&&!line.includes(`${pkg}/.MainActivity`)
   );
@@ -402,7 +402,7 @@ try{
 
   stage('download-manager');
   const beforeDownload=requests.get('/download.txt')||0;
-  await tapWeb(0.55);
+  await tapText('DOWNLOAD_FILE');
   await waitForRequest('/download.txt',beforeDownload+1,20000);
   const downloadRow=await waitForSuccessfulDownload(30000);
   console.log(`[${engine}-smoke] download-provider-success ${downloadRow.replace(/\s+/g,' ').trim()}`);
