@@ -10,7 +10,7 @@ const requests=new Map();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const stage=name=>console.log(`[smoke] ${name}`);
 const run=async(...args)=>{
-  const timeout=args[0]==='install' ? 60000 : 30000;
+  const timeout=args[0]==='install' ? 60000 : args.includes('uiautomator') ? 10000 : 30000;
   try{
     const { stdout='' }=await execFileAsync('adb',args,{encoding:'utf8',timeout});
     return stdout;
@@ -67,19 +67,39 @@ await new Promise((resolve,reject)=>{
 });
 stage('http-server-ready');
 
-async function dumpUi(){
-  await run('shell','uiautomator','dump','/sdcard/task3-window.xml');
-  return run('shell','cat','/sdcard/task3-window.xml');
+async function dumpUi(timeout=8000){
+  const path='/data/local/tmp/task3-window.xml';
+  const started=Date.now();
+  let lastError='no hierarchy returned';
+  while(Date.now()-started<timeout){
+    try{
+      await run('shell','rm','-f',path);
+      await run('shell','uiautomator','dump',path);
+      const ui=await run('shell','cat',path);
+      if(ui.includes('<hierarchy')) return ui;
+      lastError=`invalid UI dump: ${ui.slice(0,160)}`;
+    }catch(error){
+      lastError=error?.message||String(error);
+    }
+    await sleep(350);
+  }
+  throw new Error(`UI dump unavailable after retries: ${lastError}`);
 }
 
 async function waitForUi(text,timeout=5000){
   const started=Date.now();
+  let last='';
   while(Date.now()-started<timeout){
-    const ui=await dumpUi();
-    if(ui.includes(`text="${text}"`) || ui.includes(text)) return ui;
+    try{
+      const ui=await dumpUi(Math.min(3000,Math.max(800,timeout-(Date.now()-started))));
+      last=ui;
+      if(ui.includes(`text="${text}"`) || ui.includes(text)) return ui;
+    }catch(error){
+      last=error?.message||String(error);
+    }
     await sleep(250);
   }
-  throw new Error(`UI text did not appear: ${text}`);
+  throw new Error(`UI text did not appear: ${text}; last=${String(last).slice(0,220)}`);
 }
 
 function boundsForText(ui,text){
