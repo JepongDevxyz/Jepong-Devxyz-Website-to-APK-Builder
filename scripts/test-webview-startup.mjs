@@ -47,8 +47,14 @@ const patchedCordova=patchWebViewStartupSource(cordova,'cordova');
 if(patchedCordova.includes('loadUrl(launchUrl);')){
   throw new Error('Cordova must not race runtime wiring with the default launchUrl load');
 }
+if(!patchedCordova.includes('init();')){
+  throw new Error('Cordova must initialize appView before deferred runtime wiring');
+}
 if(!patchedCordova.includes('appView.loadUrl(HOME);')){
   throw new Error('Cordova startup must load HOME after runtime wiring');
+}
+if(patchedCordova.indexOf('init();')>patchedCordova.indexOf('appView.loadUrl(HOME);')){
+  throw new Error('Cordova init must happen before deferred HOME load');
 }
 if(patchedCordova.indexOf('appView.loadUrl(HOME);')<patchedCordova.indexOf('installCordovaNavigationToolbar')){
   throw new Error('Cordova HOME load must happen after toolbar/client wiring');
