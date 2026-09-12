@@ -5,6 +5,7 @@ import {
   patchCrossEngineBrowserUxSource
 } from './patch-cross-engine-browser-ux-core.mjs';
 import { patchWebViewStartup } from './patch-webview-startup.mjs';
+import { patchCordovaAppCompatTheme } from './patch-cordova-appcompat-theme.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
@@ -75,6 +76,7 @@ function patchCapacitorVisitedHistory(cfg,projectDir){
 
 export function patchCrossEngineBrowserUx(cfg,projectDir){
   const activityPath=patchCoreBrowserUx(cfg,projectDir);
+  patchCordovaAppCompatTheme(cfg,projectDir);
   patchWebViewStartup(cfg,projectDir);
   patchCapacitorVisitedHistory(cfg,projectDir);
   return activityPath;
