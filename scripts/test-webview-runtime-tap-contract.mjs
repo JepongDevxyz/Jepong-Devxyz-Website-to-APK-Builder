@@ -17,4 +17,21 @@ for(const brittle of ['await tapWeb(0.17);','await tapWeb(0.36);','await tapWeb(
   }
 }
 
-console.log('✓ WebView runtime smoke taps actual page controls');
+const reloadStart=source.indexOf("stage('toolbar-reload');");
+const externalStart=source.indexOf("stage('external-link');",reloadStart);
+
+if(reloadStart<0 || externalStart<0){
+  throw new Error('WebView runtime smoke reload/external stages are missing');
+}
+
+const reloadBlock=source.slice(reloadStart,externalStart);
+
+if(!reloadBlock.includes("requests.get('/state/home')")){
+  throw new Error('WebView reload verification must snapshot the rendered home pageshow state');
+}
+
+if(!reloadBlock.includes("await waitForRequest('/state/home'")){
+  throw new Error('WebView reload verification must wait for rendered home before accessibility taps');
+}
+
+console.log('✓ WebView runtime smoke taps actual page controls after rendered reload');
