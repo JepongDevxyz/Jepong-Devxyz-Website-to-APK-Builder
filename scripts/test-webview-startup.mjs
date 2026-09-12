@@ -106,5 +106,11 @@ if(startupCall<coreCall){
 if(!runtimeWrapper.includes('webviewLaunchDiagnostics') || !runtimeWrapper.includes('am-start')){
   throw new Error('Effective WebView runtime smoke must print the exact am start result');
 }
+if(!runtimeWrapper.includes('pid-after-launch') || !runtimeWrapper.includes('launch-failure-logcat')){
+  throw new Error('Effective WebView runtime smoke must capture immediate no-PID launch failure logs');
+}
+if(!runtimeWrapper.includes('No app process after launch')){
+  throw new Error('Effective WebView runtime smoke must fail fast when am start completes without an app process');
+}
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');
