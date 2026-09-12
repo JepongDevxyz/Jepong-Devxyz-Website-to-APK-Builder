@@ -27,3 +27,5 @@ jobs:
         run: node scripts/test-cordova-toolbar-layout-contract.mjs
       - name: WebView accessibility tap contract
         run: node scripts/test-webview-runtime-tap-contract.mjs
+      - name: Cordova external app scheme routing
+        run: node scripts/test-cordova-external-scheme-routing.mjs
