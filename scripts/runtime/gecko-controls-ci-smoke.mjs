@@ -89,6 +89,53 @@ async function dumpFailureDiagnostics(){
   }
 
   try{
+    const files=await adb([
+      'shell','sh','-c',
+      "echo '--- /sdcard/Download ---'; ls -la /sdcard/Download 2>&1 || true; echo '--- files ---'; find /sdcard/Download /storage/emulated/0/Download -maxdepth 2 -type f -print 2>/dev/null | sort -u | head -120"
+    ]);
+    console.log(
+      `[gecko-ci] downloads-directory\n${files.trim()||'<empty>'}`
+    );
+  }catch(error){
+    console.log(
+      `[gecko-ci] downloads-directory unavailable: ${error?.message||error}`
+    );
+  }
+
+  for(const uri of [
+    'content://downloads/my_downloads',
+    'content://downloads/all_downloads',
+    'content://downloads/public_downloads'
+  ]){
+    try{
+      const rows=await adb([
+        'shell','content','query','--uri',uri
+      ]);
+      console.log(
+        `[gecko-ci] download-provider ${uri}\n${rows.trim()||'<empty>'}`
+      );
+    }catch(error){
+      console.log(
+        `[gecko-ci] download-provider ${uri} unavailable: ${error?.message||error}`
+      );
+    }
+  }
+
+  try{
+    const downloadServices=await adb([
+      'shell','sh','-c',
+      "dumpsys activity services | grep -i -B5 -A35 'download' | tail -240"
+    ]);
+    console.log(
+      `[gecko-ci] download-services\n${downloadServices.trim()||'<none>'}`
+    );
+  }catch(error){
+    console.log(
+      `[gecko-ci] download-services unavailable: ${error?.message||error}`
+    );
+  }
+
+  try{
     await adb([
       'shell','uiautomator','dump',
       '/data/local/tmp/task4-gecko-post-failure.xml'
@@ -114,9 +161,9 @@ async function dumpFailureDiagnostics(){
       .split('\n')
       .filter(
         line=>
-          /Gecko|AndroidRuntime|MainActivity|Jepong|DownloadManager|DocumentsUI|ActivityTaskManager|WindowManager/i.test(line)
+          /Gecko|AndroidRuntime|MainActivity|Jepong|DownloadManager|DownloadThread|DownloadProvider|DocumentsUI|ActivityTaskManager|WindowManager/i.test(line)
       )
-      .slice(-450)
+      .slice(-550)
       .join('\n');
     console.log(
       `[gecko-ci] logcat\n${relevant||'<no relevant log lines>'}`
