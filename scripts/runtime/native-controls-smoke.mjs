@@ -264,9 +264,9 @@ try{
 
   stage('exit-confirmation');
   await run('shell','input','keyevent','4');
-  const confirmUi=await waitForUi('Cancel',5000);
+  const confirmUi=await waitForUi('CANCEL',5000);
   const afterBack=await foregroundDump();
-  if(!afterBack.includes(pkg) || !confirmUi.includes('text="Cancel"') || !confirmUi.includes('text="Exit"')){
+  if(!afterBack.includes(pkg) || !confirmUi.includes('text="CANCEL"') || !confirmUi.includes('text="EXIT"')){
     throw new Error('Native home Back does not require explicit exit confirmation from clean root history');
   }
 
