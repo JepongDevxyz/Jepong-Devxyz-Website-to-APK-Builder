@@ -51,13 +51,13 @@ export function patchWebViewStartupSource(source,engine){
     out=replaceOnce(
       out,
       `    loadUrl(launchUrl);\n\n`,
-      `    // Initialize Cordova without starting navigation yet.\n    // CordovaActivity.loadUrl(...) normally performs this init step.\n    init();\n\n`,
+      `    // Initialize Cordova without starting navigation yet.\n    // CordovaActivity.loadUrl(...) normally performs this init step.\n    android.util.Log.i(\"JepongCordovaStartup\",\"before-init\");\n    init();\n    android.util.Log.i(\"JepongCordovaStartup\",\"after-init appView=\"+(appView!=null));\n\n`,
       'cordova premature launchUrl load'
     );
     out=replaceOnce(
       out,
       cordovaReady,
-      `${cordovaReady}\n\n      // Load only after the custom client/listeners/layout are installed.\n      appView.loadUrl(HOME);`,
+      `${cordovaReady}\n\n      // Load only after the custom client/listeners/layout are installed.\n      android.util.Log.i(\"JepongCordovaStartup\",\"before-home appView=\"+(appView!=null)+\" home=\"+HOME);\n      appView.loadUrl(HOME);\n      android.util.Log.i(\"JepongCordovaStartup\",\"after-home\");`,
       'cordova post-wiring HOME load'
     );
     return out;
