@@ -14,6 +14,7 @@ writeNative(cfg,out,false);
 patchCrossEngineBrowserUx(cfg,out);
 
 const main=fs.readFileSync(path.join(out,'app/src/main/java/com/jepongdevxyz/nativecontrolstest/MainActivity.java'),'utf8');
+const manifest=fs.readFileSync(path.join(out,'app/src/main/AndroidManifest.xml'),'utf8');
 const required=[
   'e.getY()-downY>180',
   'setVerticalScrollBarEnabled(false)',
@@ -38,6 +39,9 @@ const required=[
 ];
 for(const token of required){
   if(!main.includes(token)) throw new Error(`native control behavior missing: ${token}`);
+}
+if(!manifest.includes('android:enableOnBackInvokedCallback="true"')){
+  throw new Error('native manifest must enable OnBackInvokedCallback for modern system Back handling');
 }
 for(const id of controls){
   const evidence=getCapabilityEvidence('native','controls',id);
