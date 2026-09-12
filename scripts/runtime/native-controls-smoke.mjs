@@ -143,6 +143,13 @@ async function foregroundDump(){
   return run('shell','dumpsys','activity','activities');
 }
 
+function resumedActivityLine(dump){
+  return String(dump||'')
+    .split('\n')
+    .find(line=>/ResumedActivity|topResumedActivity/i.test(line) && /ActivityRecord/i.test(line))
+    || '';
+}
+
 try{
   stage('install');
   await run('install','-r',apk);
@@ -197,13 +204,18 @@ try{
   await tapWeb(0.46);
   await sleep(750);
   const externalTop=await foregroundDump();
-  if(externalTop.includes(`mResumedActivity: ActivityRecord`) && externalTop.includes(`${pkg}/.MainActivity`)){
+  const externalResumed=resumedActivityLine(externalTop);
+  console.log(`[smoke] external-resumed ${externalResumed.trim()||'<none>'}`);
+  if(!externalResumed) throw new Error('Could not determine resumed activity during external-link test');
+  if(externalResumed.includes(`${pkg}/.MainActivity`)){
     throw new Error('Native external link remained in the app instead of routing through ACTION_VIEW');
   }
   await run('shell','input','keyevent','4');
   await sleep(500);
   const returnedTop=await foregroundDump();
-  if(!returnedTop.includes(pkg)) throw new Error('Native app did not resume after external-link test');
+  const returnedResumed=resumedActivityLine(returnedTop);
+  console.log(`[smoke] external-returned ${returnedResumed.trim()||'<none>'}`);
+  if(!returnedResumed.includes(`${pkg}/.MainActivity`)) throw new Error('Native app did not resume after external-link test');
 
   stage('download');
   const beforeDownload=requests.get('/download.bin')||0;
