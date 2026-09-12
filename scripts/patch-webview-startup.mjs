@@ -50,6 +50,18 @@ export function patchWebViewStartupSource(source,engine){
   if(engine==='cordova'){
     out=replaceOnce(
       out,
+      `    super.onCreate(\n      savedInstanceState\n    );`,
+      `    android.util.Log.i(\"JepongCordovaStartup\",\"onCreate-enter\");\n    super.onCreate(\n      savedInstanceState\n    );\n    android.util.Log.i(\"JepongCordovaStartup\",\"after-super\");`,
+      'cordova onCreate lifecycle'
+    );
+    out=replaceOnce(
+      out,
+      `    requestSelectedPermissions();`,
+      `    android.util.Log.i(\"JepongCordovaStartup\",\"before-permissions\");\n    requestSelectedPermissions();\n    android.util.Log.i(\"JepongCordovaStartup\",\"after-permissions\");`,
+      'cordova permission request lifecycle'
+    );
+    out=replaceOnce(
+      out,
       `    loadUrl(launchUrl);\n\n`,
       `    // Initialize Cordova without starting navigation yet.\n    // CordovaActivity.loadUrl(...) normally performs this init step.\n    android.util.Log.i(\"JepongCordovaStartup\",\"before-init\");\n    init();\n    android.util.Log.i(\"JepongCordovaStartup\",\"after-init appView=\"+(appView!=null));\n\n`,
       'cordova premature launchUrl load'

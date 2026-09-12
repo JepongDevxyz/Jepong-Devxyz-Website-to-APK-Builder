@@ -84,7 +84,7 @@ for(const marker of [
 
 const platformPatcher=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
 const uxWrapper=fs.readFileSync(new URL('./patch-cross-engine-browser-ux.mjs',import.meta.url),'utf8');
-const runtimeSmoke=fs.readFileSync(new URL('./runtime/webview-engine-controls-smoke-core.mjs',import.meta.url),'utf8');
+const runtimeWrapper=fs.readFileSync(new URL('./runtime/task4-download-smoke-wrapper.mjs',import.meta.url),'utf8');
 
 if(!platformPatcher.includes("import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';")){
   throw new Error('Android platform patcher must import the browser UX wrapper');
@@ -103,8 +103,8 @@ if(coreCall<0 || startupCall<0){
 if(startupCall<coreCall){
   throw new Error('WebView startup patch must run after core browser UX wiring');
 }
-if(!runtimeSmoke.includes('[${engine}-smoke] am-start')){
-  throw new Error('WebView runtime smoke must print the exact am start result');
+if(!runtimeWrapper.includes('webviewLaunchDiagnostics') || !runtimeWrapper.includes('am-start')){
+  throw new Error('Effective WebView runtime smoke must print the exact am start result');
 }
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');

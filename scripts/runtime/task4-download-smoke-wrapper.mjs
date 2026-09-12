@@ -102,6 +102,26 @@ const webviewVerifier=`async function waitForSuccessfulDownload(timeout=60000){
   );
 }`;
 
+const webviewLaunchDiagnostics=`  const launchResult=await adb('shell','am','start','-W','-n',activity);
+  console.log(\`[\${engine}-smoke] am-start \${String(launchResult).replace(/\\s+/g,' ').trim()}\`);
+  try{
+    const resolved=await adb(
+      'shell','cmd','package','resolve-activity','--brief',
+      '-a','android.intent.action.MAIN',
+      '-c','android.intent.category.LAUNCHER',
+      pkg
+    );
+    console.log(\`[\${engine}-smoke] resolved-launcher \${String(resolved).replace(/\\s+/g,' ').trim()}\`);
+  }catch(error){
+    console.log(\`[\${engine}-smoke] resolved-launcher unavailable: \${error?.message||error}\`);
+  }
+  try{
+    const launchPid=(await adb('shell','pidof',pkg)).trim();
+    console.log(\`[\${engine}-smoke] pid-after-launch \${launchPid||'<none>'}\`);
+  }catch(error){
+    console.log(\`[\${engine}-smoke] pid-after-launch <none>\`);
+  }`;
+
 function patchVerifier(source,kind){
   if(kind==='gecko'){
     const re=/async function waitForSuccessfulDownload\([^)]*\)\{[\s\S]*?\n\}\n\nasync function diagnostics/;
@@ -112,7 +132,13 @@ function patchVerifier(source,kind){
   if(kind==='webview'){
     const re=/async function waitForSuccessfulDownload\([^)]*\)\{[\s\S]*?\n\}\n\nasync function assertNoFatalCrash/;
     if(!re.test(source)) throw new Error('WebView download verifier marker missing');
-    return source.replace(re,`${webviewVerifier}\n\nasync function assertNoFatalCrash`);
+    let patched=source.replace(re,`${webviewVerifier}\n\nasync function assertNoFatalCrash`);
+    const launchNeedle="  await adb('shell','am','start','-W','-n',activity);";
+    if(!patched.includes(launchNeedle)){
+      throw new Error('WebView launch diagnostics marker missing');
+    }
+    patched=patched.replace(launchNeedle,webviewLaunchDiagnostics);
+    return patched;
   }
 
   throw new Error(`Unknown smoke kind: ${kind}`);
