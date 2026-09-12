@@ -102,6 +102,55 @@ const webviewVerifier=`async function waitForSuccessfulDownload(timeout=60000){
   );
 }`;
 
+const webviewStartupWatcher=`async function startupLifecycleLogcat(label){
+  try{
+    const logs=await adb('logcat','-d','-t','5000');
+    const relevant=String(logs)
+      .split('\\n')
+      .filter(line=>
+        line.includes(pkg) ||
+        /JepongCordovaStartup|AndroidRuntime|FATAL EXCEPTION|ActivityTaskManager|ActivityManager|Cordova|MainActivity|InflateException|IllegalStateException|NullPointerException|ClassNotFoundException|NoClassDefFoundError|VerifyError|SecurityException|Process .* has died/i.test(line)
+      )
+      .slice(-900)
+      .join('\\n');
+    console.log(\`[\${engine}-smoke] startup-lifecycle-logcat \${label}\\n\${relevant||'<no relevant startup logs>'}\`);
+  }catch(error){
+    console.log(\`[\${engine}-smoke] startup-lifecycle-logcat unavailable: \${error?.message||error}\`);
+  }
+}
+
+async function waitForInitialRequest(pathname,minCount=1,timeout=60000){
+  const started=Date.now();
+  let missingChecks=0;
+
+  while(Date.now()-started<timeout){
+    const seen=requests.get(pathname)||0;
+    if(seen>=minCount) return seen;
+
+    let pid='';
+    try{
+      pid=(await adb('shell','pidof',pkg)).trim();
+    }catch{}
+
+    if(pid){
+      missingChecks=0;
+    }else{
+      missingChecks++;
+      if(missingChecks>=2){
+        await startupLifecycleLogcat(\`process-exit pathname=\${pathname}\`);
+        throw new Error(\`\${engine} process exited before initial request \${pathname}; observed=\${seen}\`);
+      }
+    }
+
+    await sleep(250);
+  }
+
+  await startupLifecycleLogcat(\`timeout pathname=\${pathname}\`);
+  throw new Error(
+    \`\${engine} timed out waiting for initial request \${pathname}; observed=\${requests.get(pathname)||0}\`
+  );
+}`;
+
 const webviewLaunchDiagnostics=`  const launchResult=await adb('shell','am','start','-W','-n',activity);
   console.log(\`[\${engine}-smoke] am-start \${String(launchResult).replace(/\\s+/g,' ').trim()}\`);
   try{
@@ -167,12 +216,21 @@ function patchVerifier(source,kind){
   if(kind==='webview'){
     const re=/async function waitForSuccessfulDownload\([^)]*\)\{[\s\S]*?\n\}\n\nasync function assertNoFatalCrash/;
     if(!re.test(source)) throw new Error('WebView download verifier marker missing');
-    let patched=source.replace(re,`${webviewVerifier}\n\nasync function assertNoFatalCrash`);
+    let patched=source.replace(re,`${webviewVerifier}\n\n${webviewStartupWatcher}\n\nasync function assertNoFatalCrash`);
     const launchNeedle="  await adb('shell','am','start','-W','-n',activity);";
     if(!patched.includes(launchNeedle)){
       throw new Error('WebView launch diagnostics marker missing');
     }
     patched=patched.replace(launchNeedle,webviewLaunchDiagnostics);
+
+    const initialWaitNeedle="  await waitForRequest('/index.html',1,60000);\n  await waitForRequest('/state/home',1,60000);";
+    if(!patched.includes(initialWaitNeedle)){
+      throw new Error('WebView initial request wait marker missing');
+    }
+    patched=patched.replace(
+      initialWaitNeedle,
+      "  await waitForInitialRequest('/index.html',1,60000);\n  await waitForInitialRequest('/state/home',1,60000);"
+    );
     return patched;
   }
 
