@@ -135,6 +135,10 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Capacitor browser-controls regression
+        if: matrix.engine == 'capacitor'
+        run: node scripts/test-capacitor-browser-controls.mjs
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
