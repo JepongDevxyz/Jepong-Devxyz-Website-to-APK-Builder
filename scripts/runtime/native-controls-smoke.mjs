@@ -163,7 +163,7 @@ try{
   const top=await foregroundDump();
   if(!top.includes(pkg)) throw new Error('Native controls app did not reach foreground/activity stack');
 
-  const ui=await dumpUi();
+  const ui=await waitForUi('Back',10000);
   for(const label of ['Back','Next','Home','Reload','Share']){
     if(!ui.includes(`text="${label}"`)) throw new Error(`Native navigation toolbar missing at runtime: ${label}`);
   }
