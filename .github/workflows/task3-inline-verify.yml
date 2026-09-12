@@ -69,7 +69,7 @@ jobs:
           EOF
           node scripts/build.mjs prepare --build-id "$BUILD_ID"
           node scripts/build.mjs generate --build-id "$BUILD_ID"
-      - name: Instrument generated Native Back dispatch
+      - name: Instrument generated Native runtime evidence
         shell: bash
         run: |
           python3 - <<'PY'
@@ -103,11 +103,15 @@ jobs:
                   '  public void onBackPressed(){\n    handleAppBack();\n',
                   '  public void onBackPressed(){\n    android.util.Log.d("JepongBack","onBackPressed");\n    handleAppBack();\n'
               ),
+              (
+                  '    web.setWebViewClient(new WebViewClient(){\n',
+                  '    android.util.Log.d("JepongControls","vertical="+web.isVerticalScrollBarEnabled()+" horizontal="+web.isHorizontalScrollBarEnabled()+" builtInZoom="+s.getBuiltInZoomControls()+" displayZoom="+s.getDisplayZoomControls()+" supportZoom="+s.supportZoom()+" longClickable="+web.isLongClickable()+" navColor="+getWindow().getNavigationBarColor()+" statusColor="+getWindow().getStatusBarColor());\n    web.setWebViewClient(new WebViewClient(){\n'
+              ),
           ]
 
           for old,new in replacements:
               if s.count(old)!=1:
-                  raise SystemExit(f'Back instrumentation marker count={s.count(old)} for {old!r}')
+                  raise SystemExit(f'Native runtime instrumentation marker count={s.count(old)} for {old!r}')
               s=s.replace(old,new,1)
 
           p.write_text(s)
@@ -126,7 +130,10 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: node scripts/runtime/native-controls-ci-smoke.mjs "$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+          script: |
+            APK="$(find "work/$BUILD_ID/project/app/build/outputs/apk/debug" -name '*.apk' | head -n 1)"
+            node scripts/runtime/native-controls-ci-smoke.mjs "$APK"
+            node scripts/runtime/native-controls-state-probe.mjs "$APK"
       - name: Full Task 3 verification
         shell: bash
         run: |
