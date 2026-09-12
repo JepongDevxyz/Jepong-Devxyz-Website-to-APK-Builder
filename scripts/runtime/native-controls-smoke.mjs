@@ -8,9 +8,15 @@ const activity=`${pkg}/.MainActivity`;
 const requests=new Map();
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const stage=name=>console.log(`[smoke] ${name}`);
 const run=async(...args)=>{
-  const { stdout='' }=await execFileAsync('adb',args,{encoding:'utf8'});
-  return stdout;
+  const timeout=args[0]==='install' ? 60000 : 30000;
+  try{
+    const { stdout='' }=await execFileAsync('adb',args,{encoding:'utf8',timeout});
+    return stdout;
+  }catch(error){
+    throw new Error(`ADB command failed or timed out: adb ${args.join(' ')} :: ${error?.message||error}`);
+  }
 };
 
 if(process.argv.includes('--print-cases')){
@@ -46,6 +52,7 @@ await new Promise((resolve,reject)=>{
   server.once('error',reject);
   server.listen(8765,'0.0.0.0',resolve);
 });
+stage('http-server-ready');
 
 async function dumpUi(){
   await run('shell','uiautomator','dump','/sdcard/task3-window.xml');
@@ -91,12 +98,15 @@ async function foregroundDump(){
 }
 
 try{
+  stage('install');
   await run('install','-r',apk);
+  stage('launch');
   await run('shell','am','force-stop',pkg);
   await run('shell','am','start','-W','-n',activity);
   await waitForRequest('/index.html',1);
   await sleep(1000);
 
+  stage('initial-foreground-and-toolbar');
   const top=await foregroundDump();
   if(!top.includes(pkg)) throw new Error('Native controls app did not reach foreground/activity stack');
 
@@ -106,24 +116,30 @@ try{
   }
   if(!ui.includes('TASK3_HOME')) throw new Error('deterministic Native home marker missing at runtime');
 
+  stage('navigate-page2');
   await tapText('NEXT_PAGE');
   await waitForRequest('/page2.html',1);
   await waitForUi('TASK3_PAGE_2');
 
+  stage('toolbar-back');
   await tapText('Back');
   await waitForUi('TASK3_HOME');
 
+  stage('toolbar-next');
   await tapText('Next');
   await waitForUi('TASK3_PAGE_2');
 
+  stage('toolbar-home');
   await tapText('Home');
   await waitForUi('TASK3_HOME');
 
+  stage('toolbar-reload');
   const beforeReload=requests.get('/index.html')||0;
   await tapText('Reload');
   await waitForRequest('/index.html',beforeReload+1);
   await waitForUi('TASK3_HOME');
 
+  stage('external-link');
   await tapText('EXTERNAL_LINK');
   await sleep(750);
   const externalTop=await foregroundDump();
@@ -136,9 +152,11 @@ try{
   if(!returnedTop.includes(pkg)) throw new Error('Native app did not resume after external-link test');
   await waitForUi('TASK3_HOME');
 
+  stage('download');
   await tapText('DOWNLOAD_FILE');
   await waitForRequest('/download.bin',1);
 
+  stage('exit-confirmation');
   await run('shell','input','keyevent','4');
   await waitForUi('Cancel');
   const afterBack=await foregroundDump();
@@ -148,6 +166,7 @@ try{
   }
 
   await run('shell','input','keyevent','4');
+  stage('crash-check');
   const crashes=await run('logcat','-d','-t','300');
   if(crashes.includes('FATAL EXCEPTION') && crashes.includes(pkg)){
     throw new Error('Native controls app crashed during deterministic emulator smoke');
@@ -155,5 +174,7 @@ try{
 
   console.log('✓ native controls deterministic navigation/external/download/exit smoke');
 } finally {
+  stage('http-server-close-start');
   await new Promise(resolve=>server.close(resolve));
+  stage('http-server-close-done');
 }
