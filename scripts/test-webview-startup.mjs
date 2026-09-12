@@ -85,6 +85,7 @@ for(const marker of [
 const platformPatcher=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
 const uxWrapper=fs.readFileSync(new URL('./patch-cross-engine-browser-ux.mjs',import.meta.url),'utf8');
 const runtimeWrapper=fs.readFileSync(new URL('./runtime/task4-download-smoke-wrapper.mjs',import.meta.url),'utf8');
+const runtimeCore=fs.readFileSync(new URL('./runtime/webview-engine-controls-smoke-core.mjs',import.meta.url),'utf8');
 
 if(!platformPatcher.includes("import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';")){
   throw new Error('Android platform patcher must import the browser UX wrapper');
@@ -111,6 +112,15 @@ if(!runtimeWrapper.includes('pid-after-launch') || !runtimeWrapper.includes('lau
 }
 if(!runtimeWrapper.includes('No app process after launch')){
   throw new Error('Effective WebView runtime smoke must fail fast when am start completes without an app process');
+}
+if(!runtimeCore.includes('waitForInitialRequest(')){
+  throw new Error('WebView startup smoke must monitor the app process while waiting for the initial page');
+}
+if(!runtimeCore.includes('startup-lifecycle-logcat')){
+  throw new Error('WebView startup smoke must preserve launch lifecycle logs when the app exits before HOME');
+}
+if(!runtimeCore.includes('process exited before initial request')){
+  throw new Error('WebView startup smoke must fail fast when the app process exits before HOME');
 }
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');
