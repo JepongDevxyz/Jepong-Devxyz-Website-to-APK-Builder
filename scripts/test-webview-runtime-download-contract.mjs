@@ -8,13 +8,13 @@ const includes=(text,needle,message)=>assert.ok(text.includes(needle),message);
 
 includes(
   verifier,
-  String.raw`const expectedPath=\`/sdcard/Download/task4-\${engine}.txt\`;`,
-  'WebView runtime must require exact public Downloads filename'
+  String.raw`const expectedPath=\`/sdcard/Download/task4-\${engine}-download.txt\`;`,
+  'WebView runtime must require the exact advertised public Downloads filename'
 );
 includes(
   verifier,
-  String.raw`const expectedCanonicalPath=\`/storage/emulated/0/Download/task4-\${engine}.txt\`;`,
-  'WebView runtime must require canonical public Downloads path'
+  String.raw`const expectedCanonicalPath=\`/storage/emulated/0/Download/task4-\${engine}-download.txt\`;`,
+  'WebView runtime must require the exact advertised canonical Downloads path'
 );
 includes(verifier,"await adb('shell','cat',expectedPath)",'WebView runtime must read back exact downloaded contents');
 includes(verifier,"await adb('shell','readlink','-f',expectedPath)",'WebView runtime must verify canonical downloaded path');
