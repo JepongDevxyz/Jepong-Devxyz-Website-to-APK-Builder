@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { writeNative } from './write-native.mjs';
 import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
+import { patchModernBackManifest } from './patch-modern-back-manifest.mjs';
 import { getCapabilityEvidence } from '../verification/capability-verification.mjs';
 
 const out=path.join(os.tmpdir(),'jepong-native-controls-verification');
@@ -12,6 +13,7 @@ const controls=['pullRefresh','hideScrollbars','transparentNav','pinchZoom','dis
 const cfg={websiteUrl:'https://example.com',appName:'Native Controls Test',packageName:'com.jepongdevxyz.nativecontrolstest',versionName:'1.0.0',versionCode:1,engine:'native',renderMode:'default',orientation:'auto',permissions:[],controls,extensions:[],oneSignalAppId:'',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:'',splashEnabled:false,splashDuration:0,sizeOptimization:false,abiTarget:'universal'};
 writeNative(cfg,out,false);
 patchCrossEngineBrowserUx(cfg,out);
+patchModernBackManifest(out);
 
 const main=fs.readFileSync(path.join(out,'app/src/main/java/com/jepongdevxyz/nativecontrolstest/MainActivity.java'),'utf8');
 const manifest=fs.readFileSync(path.join(out,'app/src/main/AndroidManifest.xml'),'utf8');
