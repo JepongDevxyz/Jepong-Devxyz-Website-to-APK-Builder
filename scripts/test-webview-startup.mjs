@@ -27,6 +27,14 @@ if(patchedCapacitor.indexOf('w.loadUrl(HOME);')<patchedCapacitor.indexOf('instal
 
 const cordova=`class MainActivity {
   void onCreate(){
+    super.onCreate(
+      savedInstanceState
+    );
+
+    commonSetup();
+
+    requestSelectedPermissions();
+
     loadUrl(launchUrl);
 
       if(
@@ -59,9 +67,24 @@ if(patchedCordova.indexOf('init();')>patchedCordova.indexOf('appView.loadUrl(HOM
 if(patchedCordova.indexOf('appView.loadUrl(HOME);')<patchedCordova.indexOf('installCordovaNavigationToolbar')){
   throw new Error('Cordova HOME load must happen after toolbar/client wiring');
 }
+for(const marker of [
+  'onCreate-enter',
+  'after-super',
+  'before-permissions',
+  'after-permissions',
+  'before-init',
+  'after-init appView=',
+  'before-home appView=',
+  'after-home'
+]){
+  if(!patchedCordova.includes(marker)){
+    throw new Error(`Cordova startup observability missing: ${marker}`);
+  }
+}
 
 const platformPatcher=fs.readFileSync(new URL('./patch-android-platform.mjs',import.meta.url),'utf8');
 const uxWrapper=fs.readFileSync(new URL('./patch-cross-engine-browser-ux.mjs',import.meta.url),'utf8');
+const runtimeSmoke=fs.readFileSync(new URL('./runtime/webview-engine-controls-smoke-core.mjs',import.meta.url),'utf8');
 
 if(!platformPatcher.includes("import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';")){
   throw new Error('Android platform patcher must import the browser UX wrapper');
@@ -79,6 +102,9 @@ if(coreCall<0 || startupCall<0){
 }
 if(startupCall<coreCall){
   throw new Error('WebView startup patch must run after core browser UX wiring');
+}
+if(!runtimeSmoke.includes('[${engine}-smoke] am-start')){
+  throw new Error('WebView runtime smoke must print the exact am start result');
 }
 
 console.log('✓ deterministic Capacitor/Cordova startup patch');
