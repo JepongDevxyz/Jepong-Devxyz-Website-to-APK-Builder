@@ -97,11 +97,11 @@ for(const id of [
 ]){
   Object.assign(CAPABILITY_EVIDENCE.native.controls[id],{
     generator:true,
-    build:false,
-    emulator:false,
+    build:true,
+    emulator:true,
     physical:false,
     emulatorRequired:true,
     physicalRequired:false,
-    reason:'Native generated behavior assertions passed; representative APK build and emulator runtime smoke are still required'
+    reason:'Fresh Native generator assertions, real APK build, and Android API 35 emulator runtime verification passed; physical-device evidence is not required by policy for this control'
   });
 }
