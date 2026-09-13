@@ -10,8 +10,10 @@ export default async function handler(req, res) {
     if (errors.length) return json(res, 400, { error: 'Validation failed', errors });
     const buildId = `jpx-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
     const stored = { ...config, buildId, createdAt: new Date().toISOString(), schemaVersion: 1 };
-    await putBuildConfig(buildId, stored);
-    await dispatchBuild(buildId, config.engine);
+    const saved = await putBuildConfig(buildId, stored);
+    const configCommitSha = saved?.commit?.sha;
+    if (!configCommitSha) throw new Error('GitHub did not return the build config commit SHA');
+    await dispatchBuild(buildId, config.engine, configCommitSha);
     return json(res, 202, { ok: true, buildId });
   } catch (e) {
     return json(res, 500, { error: e.message || 'Build creation failed' });
