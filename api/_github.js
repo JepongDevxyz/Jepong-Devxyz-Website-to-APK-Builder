@@ -48,12 +48,20 @@ export async function putBuildConfig(buildId, config) {
   });
 }
 
-export async function dispatchBuild(buildId, engine) {
+export async function dispatchBuild(buildId, engine, configCommitSha) {
   const { owner, repo, branch } = ghEnv();
+  if (!configCommitSha) throw new Error('Build config commit SHA is required for workflow dispatch');
   return gh(`/repos/${owner}/${repo}/actions/workflows/build-apk.yml/dispatches`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ref: branch, inputs: { build_id: buildId, engine } })
+    body: JSON.stringify({
+      ref: branch,
+      inputs: {
+        build_id: buildId,
+        engine,
+        config_commit_sha: configCommitSha
+      }
+    })
   });
 }
 
