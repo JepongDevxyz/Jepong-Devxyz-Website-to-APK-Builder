@@ -8,6 +8,7 @@ import { patchWebViewStartup } from './patch-webview-startup.mjs';
 import { patchCordovaAppCompatTheme } from './patch-cordova-appcompat-theme.mjs';
 import { patchCordovaToolbarLayout } from './patch-cordova-toolbar-layout.mjs';
 import { patchCordovaExternalSchemes } from './patch-cordova-external-schemes.mjs';
+import { patchAndroidCleartextPolicy } from './patch-android-cleartext-policy.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
@@ -83,5 +84,6 @@ export function patchCrossEngineBrowserUx(cfg,projectDir){
   patchCordovaToolbarLayout(cfg,projectDir);
   patchWebViewStartup(cfg,projectDir);
   patchCapacitorVisitedHistory(cfg,projectDir);
+  patchAndroidCleartextPolicy(cfg,projectDir);
   return activityPath;
 }
