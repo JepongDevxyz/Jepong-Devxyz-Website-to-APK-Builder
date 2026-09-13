@@ -13,6 +13,10 @@ on:
         required: true
         type: choice
         options: [native, gecko, capacitor, cordova]
+      config_commit_sha:
+        description: Exact commit that stores the build configuration
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -28,6 +32,8 @@ jobs:
     steps:
       - name: Checkout builder
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.config_commit_sha || github.sha }}
 
       - name: Setup Node 22
         uses: actions/setup-node@v7
@@ -57,9 +63,16 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
 
           if [ "$ENGINE" = "gecko" ]; then
-            sdkmanager               "platform-tools"               "platforms;android-37.1"               "build-tools;37.0.0"               "build-tools;36.0.0"
+            sdkmanager \
+              "platform-tools" \
+              "platforms;android-37.1" \
+              "build-tools;37.0.0" \
+              "build-tools;36.0.0"
           else
-            sdkmanager               "platform-tools"               "platforms;android-36"               "build-tools;36.0.0"
+            sdkmanager \
+              "platform-tools" \
+              "platforms;android-36" \
+              "build-tools;36.0.0"
           fi
 
       - name: Validate build configuration
