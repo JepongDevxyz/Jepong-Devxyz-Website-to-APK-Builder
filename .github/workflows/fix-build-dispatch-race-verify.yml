@@ -1,0 +1,67 @@
+name: Fix Build Dispatch Race Verify
+
+on:
+  push:
+    branches: [fix-build-config-dispatch-race]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Native Android SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Run regression suite
+        run: npm test
+
+      - name: Run syntax checks
+        run: npm run check
+
+      - name: Prepare formerly failing build config
+        run: node scripts/build.mjs prepare --build-id jpx-mtz805hw-bb67f1
+
+      - name: Generate formerly failing native project
+        run: node scripts/build.mjs generate --build-id jpx-mtz805hw-bb67f1
+
+      - name: Setup Gradle 9.6
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build formerly failing Native APK
+        shell: bash
+        run: |
+          cd work/jpx-mtz805hw-bb67f1/project
+          gradle --no-daemon :app:assembleRelease --stacktrace
+
+      - name: Locate APK
+        shell: bash
+        run: |
+          APK="$(node scripts/build.mjs locate-apk --build-id jpx-mtz805hw-bb67f1 | tail -n 1)"
+          test -f "$APK"
+          ls -lh "$APK"
