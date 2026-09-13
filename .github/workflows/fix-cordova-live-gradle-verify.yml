@@ -1,0 +1,23 @@
+name: Fix Cordova Live Gradle Verify
+
+on:
+  push:
+    branches: [fix-cordova-live-gradle]
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Cordova live workflow regression
+        run: node scripts/test-cordova-build-workflow-parity.mjs
