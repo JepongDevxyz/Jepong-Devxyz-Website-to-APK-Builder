@@ -7,9 +7,13 @@ on:
 permissions:
   contents: read
 
+env:
+  BUILD_ID: jpx-mtzamzz9-4001d5
+
 jobs:
-  regression:
+  exact-failed-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout fix branch
         uses: actions/checkout@v7
@@ -19,5 +23,97 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Cordova live workflow regression
-        run: node scripts/test-cordova-build-workflow-parity.mjs
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Run full regression suite
+        run: npm test
+
+      - name: Run syntax checks
+        run: npm run check
+
+      - name: Prepare exact failed config
+        run: node scripts/build.mjs prepare --build-id "$BUILD_ID"
+
+      - name: Generate exact failed Cordova project
+        run: node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Setup Gradle 8.14.2
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.2'
+
+      - name: Build exact failed Cordova APK
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cordova platform add android@15.1.0
+          npx cordova prepare android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
+          cd "work/$BUILD_ID/project/platforms/android"
+          gradle --no-daemon assembleRelease --stacktrace
+
+      - name: Locate exact APK
+        id: apk
+        shell: bash
+        run: |
+          APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
+          test -f "$APK"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          ls -lh "$APK"
+
+      - name: Sign exact APK using configured signer
+        shell: bash
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APK="${{ steps.apk.outputs.apk }}"
+          ALIGNED="${APK%.apk}-aligned.apk"
+          SIGNED="${APK%.apk}-signed.apk"
+          KEYSTORE="$RUNNER_TEMP/jepong-signing.jks"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name zipalign | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+          test -n "${APK_KEYSTORE_BASE64:-}"
+          test -n "${APK_KEYSTORE_PASSWORD:-}"
+          test -n "${APK_KEY_ALIAS:-}"
+          test -n "${APK_KEY_PASSWORD:-}"
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$APK_KEY_ALIAS" \
+            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$APK_KEY_PASSWORD" \
+            --out "$SIGNED" \
+            "$ALIGNED"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED"
+          mv "$SIGNED" "$APK"
+          rm -f "$ALIGNED" "$KEYSTORE"
+
+      - name: Upload exact verified APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: cordova-exact-failed-config-verified
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 7
