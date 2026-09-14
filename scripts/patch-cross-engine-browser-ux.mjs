@@ -10,6 +10,7 @@ import { patchCordovaToolbarLayout } from './patch-cordova-toolbar-layout.mjs';
 import { patchCordovaExternalSchemes } from './patch-cordova-external-schemes.mjs';
 import { patchAndroidCleartextPolicy } from './patch-android-cleartext-policy.mjs';
 import { patchDeterministicAndroidSplash } from './android-splash-launcher.mjs';
+import { relocateAndroidSplashToAsset } from './relocate-android-splash-asset.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
@@ -168,7 +169,7 @@ function preserveSplashWiringTrace(cfg,projectDir){
   let source=fs.readFileSync(activityPath,'utf8');
 
   if(!source.includes('app_splash')){
-    source += '\n// app_splash is rendered by JepongSplashActivity before MainActivity.\n';
+    source += '\n// app_splash is rendered from packaged assets by JepongSplashActivity before MainActivity.\n';
     fs.writeFileSync(activityPath,source);
   }
 }
@@ -183,6 +184,7 @@ export function patchCrossEngineBrowserUx(cfg,projectDir){
   patchAndroidCleartextPolicy(cfg,projectDir);
   normalizeMainActivityManifestForSplash(cfg,projectDir);
   patchDeterministicAndroidSplash(cfg,projectDir);
+  relocateAndroidSplashToAsset(cfg,projectDir);
   preserveSplashWiringTrace(cfg,projectDir);
   return activityPath;
 }
