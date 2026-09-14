@@ -50,9 +50,11 @@ const iconFallback=brandedAsset({},'icon');
 const splashFallback=brandedAsset({},'splash');
 assert.equal(iconFallback.ext,'png','icon: fallback extension must be PNG');
 assert.equal(splashFallback.ext,'png','splash: fallback extension must be PNG');
-assert.equal(sha256(iconFallback.buffer),EXPECTED.icon.sha256,'icon: source bytes must remain unchanged');
+assert.deepEqual(pngSize(iconFallback.buffer,'normalized icon'),{width:EXPECTED.icon.width,height:EXPECTED.icon.height});
 assert.deepEqual(pngSize(splashFallback.buffer,'normalized splash'),{width:EXPECTED.splash.width,height:EXPECTED.splash.height});
+assert.notEqual(iconFallback.buffer[25],3,'icon: Android output must not remain indexed/palette PNG');
 assert.notEqual(splashFallback.buffer[25],3,'splash: Android output must not remain indexed/palette PNG');
+const normalizedIconHash=sha256(iconFallback.buffer);
 const normalizedSplashHash=sha256(splashFallback.buffer);
 
 const baseConfig={
@@ -85,22 +87,22 @@ for(const engine of ['native','gecko','capacitor','cordova']){
 
   if(engine==='native' || engine==='gecko'){
     writeNative(cfg,root,engine==='gecko');
-    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_icon.png'),EXPECTED.icon.sha256,`${engine} icon`);
+    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_icon.png'),normalizedIconHash,`${engine} icon`);
     assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_splash.png'),normalizedSplashHash,`${engine} splash`);
   }
 
   if(engine==='capacitor'){
     writeCapacitor(cfg,root);
-    assertFileHash(path.join(root,'branding/app_icon.png'),EXPECTED.icon.sha256,'capacitor icon');
+    assertFileHash(path.join(root,'branding/app_icon.png'),normalizedIconHash,'capacitor icon');
     assertFileHash(path.join(root,'branding/app_splash.png'),normalizedSplashHash,'capacitor splash');
   }
 
   if(engine==='cordova'){
     writeCordova(cfg,root);
     for(const [file,hash,label] of [
-      ['branding/app_icon.png',EXPECTED.icon.sha256,'cordova branded icon'],
+      ['branding/app_icon.png',normalizedIconHash,'cordova branded icon'],
       ['branding/app_splash.png',normalizedSplashHash,'cordova branded splash'],
-      ['res/icon.png',EXPECTED.icon.sha256,'cordova bootstrap icon'],
+      ['res/icon.png',normalizedIconHash,'cordova bootstrap icon'],
       ['res/screen/android/splash.png',normalizedSplashHash,'cordova bootstrap splash']
     ]){
       assertFileHash(path.join(root,file),hash,label);
@@ -114,4 +116,4 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   fs.rmSync(root,{recursive:true,force:true});
 }
 
-console.log('✓ Jepong Devxyz default icon is preserved and Android-safe splash propagates to all four engines');
+console.log('✓ Jepong Devxyz Android-safe default icon + splash propagate to all four engines');
