@@ -1,0 +1,89 @@
+name: Repair Default Splash PNG
+
+on:
+  push:
+    branches: [fix-splash-apksigner-three-engines]
+    paths:
+      - '.github/workflows/repair-default-splash.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix-splash-apksigner-three-engines
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Repair malformed PLTE length without changing pixel payload
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const file='assets/default-splash.png';
+          const oldSha='c3117fe7dc6faa1a0dc338ac06b2f4018111f23215c2d89af78842da9ab3a805';
+          const b=fs.readFileSync(file);
+          const sha=crypto.createHash('sha256').update(b).digest('hex');
+          const pngSig='89504e470d0a1a0a';
+          if(b.subarray(0,8).toString('hex')!==pngSig) throw new Error('default splash is not PNG');
+
+          function validStructure(buf){
+            let off=8;
+            const types=[];
+            while(off+12<=buf.length){
+              const len=buf.readUInt32BE(off);
+              const type=buf.toString('ascii',off+4,off+8);
+              const end=off+12+len;
+              if(end>buf.length) return false;
+              types.push(type);
+              off=end;
+              if(type==='IEND') return off===buf.length && types[0]==='IHDR' && types.includes('PLTE') && types.includes('IDAT');
+            }
+            return false;
+          }
+
+          if(sha!==oldSha){
+            if(validStructure(b)){
+              console.log(`Default splash already has valid PNG chunk structure; sha256=${sha}`);
+              process.exit(0);
+            }
+            throw new Error(`Unexpected default splash SHA-256 ${sha}`);
+          }
+
+          if(b.readUInt32BE(33)!==768) throw new Error(`Expected malformed PLTE length 768, got ${b.readUInt32BE(33)}`);
+          if(b.toString('ascii',37,41)!=='PLTE') throw new Error('Expected PLTE at byte 37');
+          if(b.toString('ascii',805,809)!=='IDAT') throw new Error('Expected IDAT at byte 805');
+          if(b.readUInt32BE(801)!==2440) throw new Error(`Expected IDAT length 2440, got ${b.readUInt32BE(801)}`);
+
+          const repaired=Buffer.from(b);
+          repaired.writeUInt32BE(756,33);
+          if(!validStructure(repaired)) throw new Error('Repaired splash still has invalid PNG chunk structure');
+          // Only bytes 33..36 may change.
+          for(let i=0;i<b.length;i++){
+            if(i>=33 && i<=36) continue;
+            if(b[i]!==repaired[i]) throw new Error(`Unexpected payload change at byte ${i}`);
+          }
+          fs.writeFileSync(file,repaired);
+          const newSha=crypto.createHash('sha256').update(repaired).digest('hex');
+          console.log(`Repaired PLTE length 768 -> 756; bytes=${repaired.length}; sha256=${newSha}`);
+          NODE
+      - name: Commit repaired splash
+        shell: bash
+        run: |
+          if git diff --quiet -- assets/default-splash.png; then
+            echo 'No repair commit needed.'
+            exit 0
+          fi
+          git config user.name 'JepongDevxyz'
+          git config user.email 'businessdevgithubjepong@gmail.com'
+          git add assets/default-splash.png
+          git commit -m 'fix: repair default splash PNG chunk length'
+          git push origin HEAD:fix-splash-apksigner-three-engines
