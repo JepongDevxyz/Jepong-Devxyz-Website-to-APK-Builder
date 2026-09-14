@@ -1,39 +1,47 @@
-# Jepong Devxyz Website-to-APK Builder
+# Jepong Devxyz Website → APK Builder
 
-Build Android APK wrappers from a website using Native WebView, GeckoView, Capacitor, or Cordova.
+A Vercel-compatible frontend/API plus GitHub Actions APK build pipeline. It keeps engine toolchains separate so Native WebView, GeckoView, Capacitor, and Cordova do not share incompatible Gradle/Java assumptions.
 
-## Engines
+## Verified/pinned stack (2026-09-09)
 
-- Native WebView
-- GeckoView
-- Capacitor
-- Cordova
+- Native Android: Android Gradle Plugin 9.4.0, Gradle 9.6.0, JDK 17, compile/target SDK 36.
+- GeckoView: stable `org.mozilla.geckoview:geckoview:154.0.20260824154132`, JDK 17.
+- Capacitor: 8.5.0, Android template line uses AGP 8.13.0 / Gradle 8.14.3 / Java 21.
+- Cordova CLI: 13.0.0; cordova-android: 15.1.0; Gradle 8.14.2; AGP 8.10.1; JDK 17.
+- OneSignal Android: 5.9.8 when an App ID is configured; Capacitor plugin 1.1.8.
+- GitHub Actions: checkout v7, setup-node v7, setup-java v6, setup-android v4, setup-gradle v6, upload-artifact v7.
 
-## Verification
+## Important compatibility behavior
 
-The repository includes generator, capability, runtime-contract, and APK build verification workflows. Capability labels are evidence-driven: `Verified`, `Experimental`, or `Unsupported`.
+The UI intentionally greys out controls that are not safely implemented for the selected engine. In particular, true AdGuard DNS requires an Android VPN/DNS filtering layer and is not faked. Firefox-style extensions are offered only with GeckoView and are installed from Mozilla-signed Firefox Add-ons XPI endpoints at runtime; their publisher/Mozilla compatibility can change independently of this builder.
 
-## Build flow
+The 11 Device Permission switches control Android manifest/runtime permission requests. Some sensitive device APIs (contacts, calendar, biometrics, Bluetooth, sensors) are not automatically exposed as JavaScript APIs to arbitrary websites; this is intentional for privacy/security.
 
-1. Configure the website/app details in the web UI.
-2. Choose an engine and supported capabilities.
-3. Generate a build configuration.
-4. GitHub Actions generates and builds the Android project.
-5. The final APK is aligned, signed, verified, and uploaded as an artifact.
+## GitHub setup
 
-## Branding
+1. Create a GitHub repository and upload this project.
+2. Create a fine-grained GitHub token for the builder backend with access to this repository:
+   - Contents: Read and write (the backend stores each build config under `builds/`).
+   - Actions: Read and write (dispatch workflow and read runs/artifacts/logs).
+3. Deploy the same repository to Vercel.
+4. Set Vercel environment variables from `.env.example`:
+   - `GH_BUILDER_TOKEN`
+   - `GH_OWNER`
+   - `GH_REPO`
+   - `GH_BRANCH` (usually `main`)
+5. Open the deployed site, configure an app, and press **Generate & Build APK**.
 
-Custom icon and splash uploads override the defaults. When no custom branding is supplied, the builder uses the bundled Jepong Devxyz default icon and splash screen across all engines.
+The backend stores the compressed PNG icon/splash inside the build JSON, dispatches `.github/workflows/build-apk.yml`, polls GitHub job/step state, exposes job logs, and proxies the final APK out of the GitHub artifact ZIP so the website download does not redirect the user to GitHub.
 
-## Security
-
-- Build inputs are validated before project generation.
-- APK signing is performed in GitHub Actions; private keystore material belongs in GitHub Actions secrets and is never embedded in browser code.
-- Unsupported website-facing native APIs remain disabled unless a secure bridge exists.
-
-## Local checks
+## Local validation
 
 ```bash
 npm test
 npm run check
 ```
+
+These tests validate JavaScript syntax and generate all four engine project directory structures using a fixture config. A full Android compile needs an Android SDK and network access to Google/Mozilla/Maven/npm repositories; the included GitHub Actions workflow is the intended clean-room E2E compiler.
+
+## Default branding
+
+If no custom image is selected, the generated Android app uses the Jepong Devxyz default vector branding. Uploaded browser-supported images are downscaled and converted to PNG before they are sent to the backend.
