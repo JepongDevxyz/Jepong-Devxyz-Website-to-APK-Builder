@@ -1,0 +1,21 @@
+name: Verify Default Branding
+
+on:
+  push:
+    branches: [branding-defaults-all-engines]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  branding-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Run approved branding regression
+        run: node scripts/test-default-branding-assets.mjs
