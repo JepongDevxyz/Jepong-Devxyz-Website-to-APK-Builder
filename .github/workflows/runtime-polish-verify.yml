@@ -1,0 +1,22 @@
+name: Runtime Polish Verify
+
+on:
+  push:
+    branches: [fix-runtime-polish-splash-bars-gecko]
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Run regression suite
+        run: npm test
+      - name: Run syntax checks
+        run: npm run check
