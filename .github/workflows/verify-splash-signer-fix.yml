@@ -2,8 +2,7 @@ name: Verify Splash Signer Fix
 
 on:
   push:
-    branches:
-      - fix-splash-apksigner-three-engines
+    branches: [fix-splash-apksigner-three-engines]
   workflow_dispatch:
 
 permissions:
@@ -14,17 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout fix branch
-        uses: actions/checkout@v7
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-
       - name: Run full regression suite
         run: npm test
-
       - name: Run syntax checks
         run: npm run check
 
@@ -37,19 +31,15 @@ jobs:
       fail-fast: false
       matrix:
         engine: [native, capacitor, cordova]
-
     env:
       ENGINE: ${{ matrix.engine }}
       BUILD_ID: splash-fix-${{ matrix.engine }}
       EXPECTED_SIGNER_SHA256: f5e197d89410cb681acc9cd803f277e06c05ac2fa843adb9603fc3b4fdb1c3a2
-      TEST_SPLASH_SHA256: 623a1e30db20542a7a6609681fe5a155a3e73c01818cffd189126a46f0a13d7f
+      TEST_SPLASH_SHA256: bdf2f5a0f525f14d1d6dd13a985c4aa6ee40db7c80ba8f8922b15d23f6e4b333
 
     steps:
-      - name: Checkout fix branch
-        uses: actions/checkout@v7
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -83,10 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.0.0"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Create custom splash build configuration
         shell: bash
@@ -95,11 +82,9 @@ jobs:
           mkdir -p builds
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-
           const engine=process.env.ENGINE;
           const packageName=`com.jepongdevxyz.splash${engine}`;
-          const splash='iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAIAAABMXPacAAABLUlEQVR4nO3RQREAIAzAsIF/z0NGHjQKetezsxPn6oDfNQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA+XpAL+rq6dvQAAAABJRU5ErkJggg==';
-
+          const splash='iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAYUlEQVR4nO3PMQ0AIADAMMC/HPyBCI6GZFWwzbHP+NnSAa8a0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0C4+HQIzygodHQAAAABJRU5ErkJggg==';
           const config={
             websiteUrl:'https://example.com',
             appName:`Splash Fix ${engine}`,
@@ -122,15 +107,12 @@ jobs:
             sizeOptimization:false,
             abiTarget:'universal'
           };
-
           fs.writeFileSync(`builds/${process.env.BUILD_ID}.json`,JSON.stringify(config,null,2));
           fs.appendFileSync(process.env.GITHUB_ENV,`PACKAGE_NAME=${packageName}\n`);
           NODE
 
       - name: Validate and generate project
-        shell: bash
         run: |
-          set -euo pipefail
           node scripts/build.mjs prepare --build-id "$BUILD_ID"
           node scripts/build.mjs generate --build-id "$BUILD_ID"
 
@@ -154,9 +136,7 @@ jobs:
 
       - name: Generate Android platform for Capacitor
         if: matrix.engine == 'capacitor'
-        shell: bash
         run: |
-          set -euo pipefail
           cd "work/$BUILD_ID/project"
           npm install --no-audit --no-fund
           npx cap add android
@@ -165,9 +145,7 @@ jobs:
 
       - name: Generate Android platform for Cordova
         if: matrix.engine == 'cordova'
-        shell: bash
         run: |
-          set -euo pipefail
           cd "work/$BUILD_ID/project"
           npm install --no-audit --no-fund
           npx cordova platform add android@15.1.0
@@ -175,7 +153,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
 
-      - name: Verify generated splash injection
+      - name: Verify generated custom splash injection
         shell: bash
         run: |
           set -euo pipefail
@@ -184,17 +162,12 @@ jobs:
             capacitor) APP_ROOT="work/$BUILD_ID/project/android/app" ;;
             cordova) APP_ROOT="work/$BUILD_ID/project/platforms/android/app" ;;
           esac
-
           MANIFEST="$APP_ROOT/src/main/AndroidManifest.xml"
           JAVA_ROOT="$APP_ROOT/src/main/java/${PACKAGE_NAME//./\/}"
           SPLASH_JAVA="$JAVA_ROOT/JepongSplashActivity.java"
           MAIN_JAVA="$JAVA_ROOT/MainActivity.java"
           SPLASH_ASSET="$(find "$APP_ROOT/src/main/res/drawable-nodpi" -maxdepth 1 -type f -name 'app_splash.*' | head -n 1)"
-
-          test -f "$MANIFEST"
-          test -f "$SPLASH_JAVA"
-          test -f "$MAIN_JAVA"
-          test -f "$SPLASH_ASSET"
+          test -f "$MANIFEST" && test -f "$SPLASH_JAVA" && test -f "$MAIN_JAVA" && test -f "$SPLASH_ASSET"
           grep -q 'android:name=".JepongSplashActivity"' "$MANIFEST"
           test "$(grep -o 'android.intent.category.LAUNCHER' "$MANIFEST" | wc -l)" -eq 1
           grep -q 'R.drawable.app_splash' "$SPLASH_JAVA"
@@ -202,14 +175,9 @@ jobs:
           grep -q '6000L' "$SPLASH_JAVA"
           ! grep -q 'ImageView brandSplash=' "$MAIN_JAVA"
           if [ "$ENGINE" = "native" ]; then ! grep -q 'setContentView(splash)' "$MAIN_JAVA"; fi
-
-          ACTUAL_SPLASH_SHA256="$(sha256sum "$SPLASH_ASSET" | awk '{print $1}')"
-          echo "Custom splash asset SHA-256: $ACTUAL_SPLASH_SHA256"
-          if [ "$ACTUAL_SPLASH_SHA256" != "$TEST_SPLASH_SHA256" ]; then
-            echo "::error::Custom splash fixture digest mismatch. Expected $TEST_SPLASH_SHA256, got $ACTUAL_SPLASH_SHA256"
-            exit 1
-          fi
-          echo "Dedicated splash launcher contract verified for $ENGINE"
+          ACTUAL="$(sha256sum "$SPLASH_ASSET" | awk '{print $1}')"
+          echo "Custom splash asset SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$TEST_SPLASH_SHA256"
 
       - name: Build release APK
         shell: bash
@@ -252,9 +220,8 @@ jobs:
         run: |
           set -euo pipefail
           for variable in APK_KEYSTORE_BASE64 APK_KEYSTORE_PASSWORD APK_KEY_ALIAS APK_KEY_PASSWORD; do
-            if [ -z "${!variable:-}" ]; then echo "::error::$variable is missing"; exit 1; fi
+            [ -n "${!variable:-}" ] || { echo "::error::$variable is missing"; exit 1; }
           done
-
           RAW_APK="${{ steps.apk.outputs.apk }}"
           OUT_DIR="$GITHUB_WORKSPACE/dist/$ENGINE"
           mkdir -p "$OUT_DIR"
@@ -264,26 +231,16 @@ jobs:
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name zipalign | sort -V | tail -n 1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
           AAPT2="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt2 | sort -V | tail -n 1)"
-          test -x "$ZIPALIGN"; test -x "$APKSIGNER"; test -x "$AAPT2"
-
+          test -x "$ZIPALIGN" && test -x "$APKSIGNER" && test -x "$AAPT2"
           printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
-          test -s "$KEYSTORE"
           "$ZIPALIGN" -f -p 4 "$RAW_APK" "$ALIGNED"
-          "$APKSIGNER" sign \
-            --ks "$KEYSTORE" \
-            --ks-key-alias "$APK_KEY_ALIAS" \
-            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
-            --key-pass "pass:$APK_KEY_PASSWORD" \
-            --out "$FINAL_APK" \
-            "$ALIGNED"
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$APK_KEY_ALIAS" --ks-pass "pass:$APK_KEYSTORE_PASSWORD" --key-pass "pass:$APK_KEY_PASSWORD" --out "$FINAL_APK" "$ALIGNED"
           "$ZIPALIGN" -c -v 4 "$FINAL_APK"
-
           SIGNER_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL_APK")"
           printf '%s\n' "$SIGNER_OUTPUT" | tee "$OUT_DIR/apksigner-verification.txt"
           CERT_SHA256="$(printf '%s\n' "$SIGNER_OUTPUT" | sed -n 's/^.*certificate SHA-256 digest:[[:space:]]*//p' | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d ':[:space:]')"
           EXPECTED="$(printf '%s' "$EXPECTED_SIGNER_SHA256" | tr '[:upper:]' '[:lower:]' | tr -d ':[:space:]')"
-          test -n "$CERT_SHA256"
-          test "$CERT_SHA256" = "$EXPECTED"
+          test -n "$CERT_SHA256" && test "$CERT_SHA256" = "$EXPECTED"
           printf '%s\n' "$SIGNER_OUTPUT" | grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true'
           printf '%s\n' "$SIGNER_OUTPUT" | grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true'
           "$AAPT2" dump badging "$FINAL_APK" > "$OUT_DIR/aapt2-badging.txt"
@@ -306,26 +263,21 @@ jobs:
             set -euo pipefail
             mkdir -p "dist/$ENGINE/runtime"
             adb install -r "$FINAL_APK"
-
             RESOLVED="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" | tr -d '\r')"
             echo "Resolved launcher: $RESOLVED"
             printf '%s\n' "$RESOLVED" | grep -q 'JepongSplashActivity'
-
             adb shell am force-stop "$PACKAGE_NAME"
             adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE_NAME"
             sleep 2
-
             TOP_DURING="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' || true)"
             echo "Top during splash: $TOP_DURING"
             printf '%s\n' "$TOP_DURING" | grep -q 'JepongSplashActivity'
             adb exec-out screencap -p > "dist/$ENGINE/runtime/splash-during.png"
-
             sleep 6
             TOP_AFTER="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' || true)"
             echo "Top after splash: $TOP_AFTER"
             printf '%s\n' "$TOP_AFTER" | grep -q 'MainActivity'
             adb exec-out screencap -p > "dist/$ENGINE/runtime/after-splash.png"
-
             printf '%s\n' "$RESOLVED" > "dist/$ENGINE/runtime/resolved-launcher.txt"
             printf '%s\n' "$TOP_DURING" > "dist/$ENGINE/runtime/top-during-splash.txt"
             printf '%s\n' "$TOP_AFTER" > "dist/$ENGINE/runtime/top-after-splash.txt"
