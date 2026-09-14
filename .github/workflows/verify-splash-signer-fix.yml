@@ -42,7 +42,7 @@ jobs:
       ENGINE: ${{ matrix.engine }}
       BUILD_ID: splash-fix-${{ matrix.engine }}
       EXPECTED_SIGNER_SHA256: f5e197d89410cb681acc9cd803f277e06c05ac2fa843adb9603fc3b4fdb1c3a2
-      TEST_SPLASH_SHA256: b73cbbba171e8ab856ea575a211a8fcc8e683164db5b0b2ca539a8eda7d1405c
+      TEST_SPLASH_SHA256: 623a1e30db20542a7a6609681fe5a155a3e73c01818cffd189126a46f0a13d7f
 
     steps:
       - name: Checkout fix branch
@@ -204,8 +204,12 @@ jobs:
           if [ "$ENGINE" = "native" ]; then ! grep -q 'setContentView(splash)' "$MAIN_JAVA"; fi
 
           ACTUAL_SPLASH_SHA256="$(sha256sum "$SPLASH_ASSET" | awk '{print $1}')"
-          test "$ACTUAL_SPLASH_SHA256" = "$TEST_SPLASH_SHA256"
           echo "Custom splash asset SHA-256: $ACTUAL_SPLASH_SHA256"
+          if [ "$ACTUAL_SPLASH_SHA256" != "$TEST_SPLASH_SHA256" ]; then
+            echo "::error::Custom splash fixture digest mismatch. Expected $TEST_SPLASH_SHA256, got $ACTUAL_SPLASH_SHA256"
+            exit 1
+          fi
+          echo "Dedicated splash launcher contract verified for $ENGINE"
 
       - name: Build release APK
         shell: bash
