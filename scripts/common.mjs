@@ -109,7 +109,7 @@ export function normalizePngForAndroid(buffer) {
 
   if (colorType !== 3) return buffer;
   if (![1,2,4,8].includes(bitDepth) || compression !== 0 || filterMethod !== 0 || interlace !== 0) {
-    throw new Error(`Unsupported indexed splash PNG (bitDepth=${bitDepth}, interlace=${interlace})`);
+    throw new Error(`Unsupported indexed branding PNG (bitDepth=${bitDepth}, interlace=${interlace})`);
   }
 
   let palette = null;
@@ -121,7 +121,7 @@ export function normalizePngForAndroid(buffer) {
     const type = buffer.toString('ascii', offset + 4, offset + 8);
     const dataStart = offset + 8;
     const dataEnd = dataStart + length;
-    if (dataEnd + 4 > buffer.length) throw new Error(`Malformed splash PNG chunk ${type}`);
+    if (dataEnd + 4 > buffer.length) throw new Error(`Malformed branding PNG chunk ${type}`);
     const data = buffer.subarray(dataStart, dataEnd);
     if (type === 'PLTE') palette = data;
     else if (type === 'tRNS') transparency = data;
@@ -130,8 +130,8 @@ export function normalizePngForAndroid(buffer) {
     offset = dataEnd + 4;
   }
 
-  if (!palette || palette.length < 3 || palette.length % 3 !== 0) throw new Error('Indexed splash PNG is missing a valid PLTE palette');
-  if (!idat.length) throw new Error('Indexed splash PNG is missing IDAT data');
+  if (!palette || palette.length < 3 || palette.length % 3 !== 0) throw new Error('Indexed branding PNG is missing a valid PLTE palette');
+  if (!idat.length) throw new Error('Indexed branding PNG is missing IDAT data');
 
   const raw = zlib.inflateSync(Buffer.concat(idat));
   const rows = unfilterIndexedRows(raw, width, height, bitDepth);
@@ -142,7 +142,7 @@ export function normalizePngForAndroid(buffer) {
     for (let x = 0; x < width; x++) {
       const index = indexedPixel(row, x, bitDepth);
       const paletteOffset = index * 3;
-      if (paletteOffset + 2 >= palette.length) throw new Error(`Indexed splash PNG palette index ${index} is out of range`);
+      if (paletteOffset + 2 >= palette.length) throw new Error(`Indexed branding PNG palette index ${index} is out of range`);
       rgba[out++] = palette[paletteOffset];
       rgba[out++] = palette[paletteOffset + 1];
       rgba[out++] = palette[paletteOffset + 2];
@@ -170,12 +170,12 @@ export function normalizePngForAndroid(buffer) {
 export function brandedAsset(cfg, kind) {
   const uploaded = dataUrlToAsset(kind === 'icon' ? cfg.iconDataUrl : cfg.splashDataUrl);
   if (uploaded) {
-    if (kind === 'splash' && uploaded.ext === 'png') return { ...uploaded, buffer: normalizePngForAndroid(uploaded.buffer) };
+    if (uploaded.ext === 'png') return { ...uploaded, buffer: normalizePngForAndroid(uploaded.buffer) };
     return uploaded;
   }
   const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.png' : 'default-splash.png');
   if (!fs.existsSync(fallback)) throw new Error(`Missing default ${kind} asset: ${fallback}`);
   const buffer = fs.readFileSync(fallback);
-  return { ext:'png', buffer: kind === 'splash' ? normalizePngForAndroid(buffer) : buffer };
+  return { ext:'png', buffer: normalizePngForAndroid(buffer) };
 }
 export function selected(arr, name) { return Array.isArray(arr) && arr.includes(name); }
