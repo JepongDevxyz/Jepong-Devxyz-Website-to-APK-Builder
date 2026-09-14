@@ -262,7 +262,6 @@ ${prepareMarker}`,
     runOnUiThread(()->{
 
       waitingForInitialWebsitePaint=false;
-      websiteReadyBehindExtensions=false;
       cancelWebsiteTimeout();`,
     'website error state reset'
   );
