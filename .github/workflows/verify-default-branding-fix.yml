@@ -16,5 +16,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Diagnose default branding assets
+        shell: bash
+        run: |
+          sha256sum assets/default-icon.png assets/default-splash.png
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          for (const file of ['assets/default-icon.png','assets/default-splash.png']) {
+            const b=fs.readFileSync(file);
+            console.log(`${file}: ${b.readUInt32BE(16)}x${b.readUInt32BE(20)} bytes=${b.length}`);
+          }
+          NODE
       - name: Run default branding contract
         run: node scripts/test-default-branding-assets.mjs
