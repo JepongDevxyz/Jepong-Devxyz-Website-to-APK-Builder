@@ -111,14 +111,27 @@ function normalizeMainActivityManifestForSplash(cfg,projectDir){
   }
 
   let xml=fs.readFileSync(manifestPath,'utf8');
-  const selfClosing=/<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*\/>/;
-  const match=xml.match(selfClosing);
 
-  if(!match){
+  const fullBlock=/<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>[\s\S]*?<\/activity>/;
+
+  if(fullBlock.test(xml)){
     return;
   }
 
-  const openTag=match[0].replace(/\s*\/>$/,'>');
+  const mainTag=/<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*>/;
+  const match=xml.match(mainTag);
+
+  if(!match){
+    throw new Error(
+      'MainActivity manifest tag missing for splash normalization'
+    );
+  }
+
+  const openTag=match[0]
+    .replace(/\/\s+(?=android:)/g,' ')
+    .replace(/\s*\/>$/,'>')
+    .replace(/\s+>/g,'>');
+
   const expanded=`${openTag}
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
