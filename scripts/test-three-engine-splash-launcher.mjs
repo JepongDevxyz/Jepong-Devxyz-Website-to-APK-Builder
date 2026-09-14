@@ -39,6 +39,16 @@ function makeAppRoot(){
 `
   );
 
+  const splashDir=path.join(
+    appRoot,
+    'src/main/res/drawable-nodpi'
+  );
+  fs.mkdirSync(splashDir,{recursive:true});
+  fs.writeFileSync(
+    path.join(splashDir,'app_splash.png'),
+    Buffer.from([0x89,0x50,0x4e,0x47])
+  );
+
   return {root,appRoot,manifestPath};
 }
 
@@ -137,11 +147,22 @@ for(const engine of ['native','capacitor','cordova']){
       'src/main/res/values/jepong_splash.xml'
     )
   );
+  const api31Styles=read(
+    path.join(
+      fixture.appRoot,
+      'src/main/res/values-v31/jepong_splash.xml'
+    )
+  );
 
   assert.match(
     styles,
     /JepongSplashTheme/,
     `${engine}: dedicated splash theme missing`
+  );
+  assert.match(
+    api31Styles,
+    /windowSplashScreenAnimatedIcon.*app_splash/,
+    `${engine}: Android 12+ branded system splash missing`
   );
 
   fs.rmSync(fixture.root,{recursive:true,force:true});
@@ -180,27 +201,30 @@ for(const engine of ['native','capacitor','cordova']){
   fs.rmSync(fixture.root,{recursive:true,force:true});
 }
 
-const nativeSource=read(
-  new URL('./write-native.mjs',import.meta.url)
+const patchCrossSource=read(
+  new URL('./patch-cross-engine-browser-ux.mjs',import.meta.url)
 );
-const patcherSource=read(
+const buildSource=read(
+  new URL('./build.mjs',import.meta.url)
+);
+const platformSource=read(
   new URL('./patch-android-platform.mjs',import.meta.url)
 );
 
 assert.match(
-  nativeSource,
-  /installAndroidSplashLauncher/,
-  'Native generator is not wired to dedicated splash launcher'
+  patchCrossSource,
+  /patchDeterministicAndroidSplash/,
+  'Shared Android browser patch path does not install deterministic splash'
 );
 assert.match(
-  patcherSource,
-  /installAndroidSplashLauncher/,
-  'Capacitor/Cordova patcher is not wired to dedicated splash launcher'
+  buildSource,
+  /cfg\.engine==='native'[\s\S]*patchCrossEngineBrowserUx\(cfg,out\)/,
+  'Native generation does not run the shared Android patch path'
 );
-assert.doesNotMatch(
-  patcherSource,
-  /ImageView brandSplash=/,
-  'Capacitor/Cordova still use timing-sensitive in-activity splash overlay'
+assert.match(
+  platformSource,
+  /patchCrossEngineBrowserUx\(cfg,project\)/,
+  'Capacitor/Cordova platform generation does not run the shared Android patch path'
 );
 
 console.log(
