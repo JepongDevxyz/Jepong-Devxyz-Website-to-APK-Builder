@@ -23,10 +23,8 @@ export function normalizePngForAndroid(buffer){if(!Buffer.isBuffer(buffer)||buff
 export function brandedAsset(cfg,kind){
   const uploaded=dataUrlToAsset(kind==='icon'?cfg.iconDataUrl:cfg.splashDataUrl);
   if(uploaded){if(uploaded.ext==='png')return {...uploaded,buffer:normalizePngForAndroid(uploaded.buffer)};return uploaded;}
-  // Approved Jepong Devxyz defaults supplied by the project owner.
-  // WebP keeps the exact branding Android-safe and compact across every engine.
-  const webp=path.join(ROOT,'assets',kind==='icon'?'default-icon.webp':'default-splash.webp');
-  if(fs.existsSync(webp))return {ext:'webp',buffer:fs.readFileSync(webp)};
+  // The approved Jepong Devxyz defaults are stored as Android-safe JPEGs.
+  // Keep the PNG copies only for legacy/browser compatibility; generated APKs must not depend on them.
   const jpg=path.join(ROOT,'assets',kind==='icon'?'default-icon.jpg':'default-splash.jpg');
   if(fs.existsSync(jpg))return {ext:'jpg',buffer:fs.readFileSync(jpg)};
   const png=path.join(ROOT,'assets',kind==='icon'?'default-icon.png':'default-splash.png');
