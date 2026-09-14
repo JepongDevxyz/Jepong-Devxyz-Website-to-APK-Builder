@@ -69,7 +69,7 @@ function patchLifecycle(source){
   }else{
     out=appendBeforeClassEnd(
       out,
-      `  @Override\n  protected void onResume(){\n    super.onResume();\n    applyJepongSystemBars();\n  }`
+      `  @Override\n  public void onResume(){\n    super.onResume();\n    applyJepongSystemBars();\n  }`
     );
   }
 
