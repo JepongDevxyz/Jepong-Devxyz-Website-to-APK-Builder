@@ -14,13 +14,13 @@ const ROOT=path.resolve(process.cwd());
 const EXPECTED={
   icon:{
     path:path.join(ROOT,'assets/default-icon.png'),
-    sha256:'90c250ecfed072925643e1c1384d02a349574770533c8c17393b9c848f7c8983',
+    sha256:'61d47cb6d913f404bd6287485762db115907a7b1221243c73780e4d6bae0fee2',
     width:256,
     height:256
   },
   splash:{
     path:path.join(ROOT,'assets/default-splash.png'),
-    sha256:'66b6825639b8ed16c434b356ddbb36dfe4ea0d93d9cd4b696b1a6e1d481ef69c',
+    sha256:'1c2433f22dff5eb11e329086717be5b4dc24ff33e3f285ec2ac4ea14b90e10bc',
     width:270,
     height:480
   }
