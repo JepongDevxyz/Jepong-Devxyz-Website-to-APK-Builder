@@ -21,8 +21,8 @@ export function dataUrlToAsset(dataUrl) {
 export function brandedAsset(cfg, kind) {
   const uploaded = dataUrlToAsset(kind === 'icon' ? cfg.iconDataUrl : cfg.splashDataUrl);
   if (uploaded) return uploaded;
-  const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.png' : 'default-splash.png');
+  const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.webp' : 'default-splash.webp');
   if (!fs.existsSync(fallback)) throw new Error(`Missing default ${kind} asset: ${fallback}`);
-  return { ext:'png', buffer:fs.readFileSync(fallback) };
+  return { ext:'webp', buffer:fs.readFileSync(fallback) };
 }
 export function selected(arr, name) { return Array.isArray(arr) && arr.includes(name); }
