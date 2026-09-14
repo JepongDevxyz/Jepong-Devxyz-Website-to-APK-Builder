@@ -211,10 +211,6 @@ const main=
     'utf8'
   );
 
-/*
-  Ignore formatting/newlines in generated Java.
-  This prevents false failures from pretty formatting.
-*/
 const compact=
   main.replace(
     /\s+/g,
@@ -225,35 +221,24 @@ const required=[
   'CAPACITOR_NAVIGATION_TOOLBAR_ENABLED=true',
   'CAPACITOR_EXTERNAL_LINKS_ENABLED=true',
   'CAPACITOR_DOWNLOAD_MANAGER_ENABLED=true',
-
   'JepongBridgeWebViewClient',
   'extendsBridgeWebViewClient',
   'request.hasGesture()',
   'super.shouldOverrideUrlLoading',
-
   'installCapacitorNavigationToolbar',
   'Intent.ACTION_SEND',
-
   'web.canGoBack()',
   'web.canGoForward()',
-
   'doUpdateVisitedHistory(WebViewview,Stringurl,booleanisReload)',
   'super.doUpdateVisitedHistory(view,url,isReload)',
-
   'setDownloadListener',
   'startCapacitorDownload',
-
   'DownloadManager.Request',
   'URLUtil.guessFileName',
-
   'CookieManager.getInstance().getCookie',
-
   'Environment.DIRECTORY_DOWNLOADS',
-
   'VISIBILITY_VISIBLE_NOTIFY_COMPLETED',
-
   'manager.enqueue',
-
   'applySystemSafeArea',
   'navigationProgress',
   'showNavigationProgress',
@@ -268,57 +253,24 @@ const required=[
 ];
 
 for(const token of required){
-
-  const normalizedToken=
-    token.replace(
-      /\s+/g,
-      ''
-    );
-
-  if(
-    !compact.includes(
-      normalizedToken
-    )
-  ){
-    throw new Error(
-      `capacitor control missing: ${token}`
-    );
+  const normalizedToken=token.replace(/\s+/g,'');
+  if(!compact.includes(normalizedToken)){
+    throw new Error(`capacitor control missing: ${token}`);
   }
 }
 
-for(const control of [
-  'navigationToolbar',
-  'externalLinks',
-  'downloadManager'
-]){
-  const capability=
-    getCapability(
-      'capacitor',
-      'controls',
-      control
-    );
+for(const control of ['navigationToolbar','externalLinks','downloadManager']){
+  const capability=getCapability('capacitor','controls',control);
 
-  if(
-    capability.status!==
-      CAPABILITY_STATUS.EXPERIMENTAL
-  ){
-    throw new Error(
-      `capacitor ${control} capability missing`
-    );
+  if(capability.status!==CAPABILITY_STATUS.VERIFIED){
+    throw new Error(`capacitor ${control} must be Verified`);
   }
-
-  if(
-    !getSelectableFeatureIds(
-      'capacitor',
-      'controls'
-    ).includes(control)
-  ){
-    throw new Error(
-      `capacitor ${control} is not selectable`
-    );
+  if(!capability.compileVerified || !capability.runtimeVerified){
+    throw new Error(`capacitor ${control} Verified metadata is stale`);
+  }
+  if(!getSelectableFeatureIds('capacitor','controls').includes(control)){
+    throw new Error(`capacitor ${control} is not selectable`);
   }
 }
 
-console.log(
-  '✓ Capacitor browser controls regression'
-);
+console.log('✓ Capacitor browser controls regression');
