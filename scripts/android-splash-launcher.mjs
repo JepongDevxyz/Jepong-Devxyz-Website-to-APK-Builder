@@ -24,6 +24,7 @@ function javaPackagePath(packageName){
 function resolveAppRoot(cfg,projectDir){
   switch(cfg?.engine){
     case 'native':
+    case 'gecko':
       return path.join(projectDir,'app');
     case 'capacitor':
       return path.join(projectDir,'android','app');
@@ -231,12 +232,12 @@ function disableLegacySplash({cfg,appRoot,durationMs}){
 
   let source=fs.readFileSync(activityPath,'utf8');
 
-  if(cfg.engine==='native'){
+  if(cfg.engine==='native' || cfg.engine==='gecko'){
     const start=source.indexOf('void begin(){');
     const next=source.indexOf('void checkPermissionsThenStart(){',start);
 
     if(start<0 || next<0){
-      throw new Error('Native legacy splash markers missing');
+      throw new Error(`${cfg.engine} legacy splash markers missing`);
     }
 
     source=
@@ -300,7 +301,7 @@ export function installAndroidSplashLauncher({
 export function patchDeterministicAndroidSplash(cfg,projectDir){
   if(
     !cfg ||
-    !['native','capacitor','cordova'].includes(cfg.engine)
+    !['native','gecko','capacitor','cordova'].includes(cfg.engine)
   ){
     return false;
   }
