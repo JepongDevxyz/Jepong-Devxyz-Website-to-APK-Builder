@@ -20,7 +20,7 @@ const EXPECTED={
   },
   splash:{
     path:path.join(ROOT,'assets/default-splash.png'),
-    sha256:'1c2433f22dff5eb11e329086717be5b4dc24ff33e3f285ec2ac4ea14b90e10bc',
+    sha256:'c3117fe7dc6faa1a0dc338ac06b2f4018111f23215c2d89af78842da9ab3a805',
     width:270,
     height:480
   }
