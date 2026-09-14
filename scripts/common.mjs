@@ -4,7 +4,7 @@ import path from 'node:path';
 export const ROOT = path.resolve(process.cwd());
 export function mkdir(p) { fs.mkdirSync(p, { recursive: true }); }
 export function write(p, s) { mkdir(path.dirname(p)); fs.writeFileSync(p, s); }
-export function escXml(s='') { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+export function escXml(s='') { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&apos;'); }
 export function javaString(s='') { return JSON.stringify(String(s)); }
 export function loadConfig(buildId) {
   const p = path.join(ROOT, 'builds', `${buildId}.json`);
