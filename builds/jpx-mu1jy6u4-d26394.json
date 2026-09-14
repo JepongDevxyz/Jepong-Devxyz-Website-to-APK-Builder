@@ -1,0 +1,33 @@
+{
+  "websiteUrl": "https://pinoymovieshub.win",
+  "appName": "Pinoy Movies Hub",
+  "packageName": "com.jepongdevxyz.app",
+  "versionName": "1.0.3",
+  "versionCode": 15,
+  "engine": "gecko",
+  "renderMode": "hardware",
+  "orientation": "auto",
+  "permissions": [],
+  "controls": [
+    "navigationToolbar",
+    "downloadManager"
+  ],
+  "extensions": [
+    "adguard",
+    "ghostery",
+    "privacyBadger",
+    "ublock"
+  ],
+  "splashEnabled": true,
+  "splashDuration": 6000,
+  "apkSigner": true,
+  "sizeOptimization": true,
+  "abiTarget": "arm64-v8a",
+  "oneSignalAppId": "",
+  "offlineFallback": "You appear to be offline. Check your connection and try again.",
+  "iconDataUrl": "",
+  "splashDataUrl": "",
+  "buildId": "jpx-mu1jy6u4-d26394",
+  "createdAt": "2026-09-14T18:04:14.236Z",
+  "schemaVersion": 1
+}
