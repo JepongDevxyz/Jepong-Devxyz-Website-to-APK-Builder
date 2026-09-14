@@ -1,0 +1,242 @@
+name: Verify Three Engine Branding and Signing
+
+on:
+  push:
+    branches: [fix-splash-apksigner-three-engines]
+    paths:
+      - '.github/workflows/verify-three-engine-branding-signing.yml'
+      - 'assets/default-icon.png'
+      - 'assets/default-splash.png'
+      - 'scripts/**'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify ${{ matrix.engine }} branding + signer
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [native, capacitor, cordova]
+    env:
+      ENGINE: ${{ matrix.engine }}
+      BUILD_ID: branding-${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21 for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Java 17
+        if: matrix.engine != 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Run permanent branding contract
+        run: node scripts/test-default-branding-assets.mjs
+
+      - name: Create default-branding build config
+        shell: bash
+        run: |
+          mkdir -p builds
+          cat > "builds/$BUILD_ID.json" <<EOF
+          {
+            "websiteUrl": "https://example.com",
+            "appName": "Jepong Branding ${ENGINE}",
+            "packageName": "com.jepongdevxyz.branding${ENGINE}",
+            "versionName": "1.0.0",
+            "versionCode": 1,
+            "engine": "$ENGINE",
+            "renderMode": "default",
+            "orientation": "portrait",
+            "permissions": [],
+            "controls": [],
+            "extensions": [],
+            "oneSignalAppId": "",
+            "offlineFallback": "Offline",
+            "iconDataUrl": "",
+            "splashDataUrl": "",
+            "splashEnabled": true,
+            "splashDuration": 2500,
+            "apkSigner": true,
+            "sizeOptimization": false,
+            "abiTarget": "universal"
+          }
+          EOF
+
+      - name: Validate and generate
+        run: |
+          node scripts/build.mjs prepare --build-id "$BUILD_ID"
+          node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Setup Gradle 9.6 for Native
+        if: matrix.engine == 'native'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Generate Capacitor Android platform
+        if: matrix.engine == 'capacitor'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cap add android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine capacitor
+
+      - name: Setup Gradle 8.14.3 for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Generate Cordova Android platform
+        if: matrix.engine == 'cordova'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cordova platform add android@15.1.0
+          npx cordova prepare android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
+
+      - name: Setup Gradle 8.14.2 for Cordova
+        if: matrix.engine == 'cordova'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.2'
+
+      - name: Verify final Android branding injection
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$ENGINE" in
+            native) APP_ROOT="work/$BUILD_ID/project/app" ;;
+            capacitor) APP_ROOT="work/$BUILD_ID/project/android/app" ;;
+            cordova) APP_ROOT="work/$BUILD_ID/project/platforms/android/app" ;;
+          esac
+
+          ICON="$APP_ROOT/src/main/res/drawable-nodpi/app_icon.png"
+          SPLASH="$APP_ROOT/src/main/res/drawable-nodpi/app_splash.png"
+          MANIFEST="$APP_ROOT/src/main/AndroidManifest.xml"
+          JAVA="$APP_ROOT/src/main/java/com/jepongdevxyz/branding${ENGINE}/JepongSplashActivity.java"
+
+          test -s "$ICON"
+          test -s "$SPLASH"
+          test -s "$MANIFEST"
+          test -s "$JAVA"
+
+          test "$(sha256sum assets/default-icon.png | awk '{print $1}')" = "$(sha256sum "$ICON" | awk '{print $1}')"
+          test "$(sha256sum assets/default-splash.png | awk '{print $1}')" = "$(sha256sum "$SPLASH" | awk '{print $1}')"
+
+          grep -q 'android:name=".JepongSplashActivity"' "$MANIFEST"
+          grep -q 'android.intent.action.MAIN' "$MANIFEST"
+          grep -q 'android.intent.category.LAUNCHER' "$MANIFEST"
+          grep -q 'R.drawable.app_splash' "$JAVA"
+          grep -q 'ImageView.ScaleType.CENTER_CROP' "$JAVA"
+
+          echo "✅ $ENGINE final Android project contains exact default icon + splash and launcher"
+
+      - name: Build Native release
+        if: matrix.engine == 'native'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          gradle --no-daemon :app:assembleRelease --stacktrace
+
+      - name: Build Capacitor release
+        if: matrix.engine == 'capacitor'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease --stacktrace
+
+      - name: Build Cordova release
+        if: matrix.engine == 'cordova'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project/platforms/android"
+          gradle --no-daemon assembleRelease --stacktrace
+
+      - name: Locate APK
+        id: apk
+        shell: bash
+        run: |
+          APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
+          test -s "$APK"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Production sign and verify final APK
+        shell: bash
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for v in APK_KEYSTORE_BASE64 APK_KEYSTORE_PASSWORD APK_KEY_ALIAS APK_KEY_PASSWORD; do
+            test -n "${!v:-}" || { echo "::error::$v is missing"; exit 1; }
+          done
+
+          APK="${{ steps.apk.outputs.apk }}"
+          ALIGNED="$RUNNER_TEMP/${ENGINE}-aligned.apk"
+          SIGNED="$RUNNER_TEMP/${ENGINE}-signed.apk"
+          KEYSTORE="$RUNNER_TEMP/jepong-production.jks"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name zipalign | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt2 | sort -V | tail -n 1)"
+          test -x "$ZIPALIGN" && test -x "$APKSIGNER" && test -x "$AAPT2"
+
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$APK_KEY_ALIAS" \
+            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$APK_KEY_PASSWORD" \
+            --out "$SIGNED" "$ALIGNED"
+
+          "$ZIPALIGN" -c -v 4 "$SIGNED"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED"
+
+          echo '===== COMPILED BRANDING RESOURCES ====='
+          "$AAPT2" dump resources "$SIGNED" | grep -E 'drawable/(app_icon|app_splash)' | head -n 20
+          unzip -l "$SIGNED" | grep -E 'app_(icon|splash)' || true
+
+          mv "$SIGNED" "$APK"
+          echo "✅ $ENGINE final APK is production-signed and branding resources are compiled"
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: branding-signed-${{ matrix.engine }}
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 7
