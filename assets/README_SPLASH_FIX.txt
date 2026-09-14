@@ -1,1 +1,0 @@
-Temporary marker for splash binary replacement transaction. This file will be removed after the binary update is committed.
