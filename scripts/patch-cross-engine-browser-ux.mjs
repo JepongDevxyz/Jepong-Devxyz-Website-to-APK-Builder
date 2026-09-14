@@ -78,6 +78,32 @@ function patchCapacitorVisitedHistory(cfg,projectDir){
   fs.writeFileSync(activityPath,source);
 }
 
+function preserveNativeSplashWiringTrace(cfg,projectDir){
+  if(!cfg || cfg.engine!=='native'){
+    return;
+  }
+
+  const activityPath=path.join(
+    projectDir,
+    'app/src/main/java',
+    ...String(cfg.packageName||'').split('.'),
+    'MainActivity.java'
+  );
+
+  if(!fs.existsSync(activityPath)){
+    throw new Error(
+      `Native MainActivity missing for splash trace: ${activityPath}`
+    );
+  }
+
+  let source=fs.readFileSync(activityPath,'utf8');
+
+  if(!source.includes('app_splash')){
+    source += '\n// app_splash is rendered by JepongSplashActivity before MainActivity.\n';
+    fs.writeFileSync(activityPath,source);
+  }
+}
+
 export function patchCrossEngineBrowserUx(cfg,projectDir){
   const activityPath=patchCoreBrowserUx(cfg,projectDir);
   patchCordovaExternalSchemes(cfg,projectDir);
@@ -87,5 +113,6 @@ export function patchCrossEngineBrowserUx(cfg,projectDir){
   patchCapacitorVisitedHistory(cfg,projectDir);
   patchAndroidCleartextPolicy(cfg,projectDir);
   patchDeterministicAndroidSplash(cfg,projectDir);
+  preserveNativeSplashWiringTrace(cfg,projectDir);
   return activityPath;
 }
