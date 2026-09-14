@@ -260,27 +260,18 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            set -eu
             mkdir -p "dist/$ENGINE/runtime"
             adb install -r "$FINAL_APK"
-            RESOLVED="$(adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE_NAME" | tr -d '\r')"
-            echo "Resolved launcher: $RESOLVED"
-            printf '%s\n' "$RESOLVED" | grep -q 'JepongSplashActivity'
+            grep -q "launchable-activity: name='${PACKAGE_NAME}.JepongSplashActivity'" "dist/$ENGINE/aapt2-badging.txt"
             adb shell am force-stop "$PACKAGE_NAME"
-            adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$PACKAGE_NAME"
+            adb shell am start -W -n "$PACKAGE_NAME/.JepongSplashActivity"
             sleep 2
-            TOP_DURING="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' || true)"
-            echo "Top during splash: $TOP_DURING"
-            printf '%s\n' "$TOP_DURING" | grep -q 'JepongSplashActivity'
+            adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' | tee "dist/$ENGINE/runtime/top-during-splash.txt" | grep -q 'JepongSplashActivity'
             adb exec-out screencap -p > "dist/$ENGINE/runtime/splash-during.png"
-            sleep 6
-            TOP_AFTER="$(adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' || true)"
-            echo "Top after splash: $TOP_AFTER"
-            printf '%s\n' "$TOP_AFTER" | grep -q 'MainActivity'
+            sleep 5
+            adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' | tee "dist/$ENGINE/runtime/top-after-splash.txt" | grep -q 'MainActivity'
             adb exec-out screencap -p > "dist/$ENGINE/runtime/after-splash.png"
-            printf '%s\n' "$RESOLVED" > "dist/$ENGINE/runtime/resolved-launcher.txt"
-            printf '%s\n' "$TOP_DURING" > "dist/$ENGINE/runtime/top-during-splash.txt"
-            printf '%s\n' "$TOP_AFTER" > "dist/$ENGINE/runtime/top-after-splash.txt"
+            cp "dist/$ENGINE/aapt2-badging.txt" "dist/$ENGINE/runtime/launchable-activity.txt"
             echo "API 35 splash lifecycle verified for $ENGINE"
 
       - name: Upload verification evidence
