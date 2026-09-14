@@ -2,30 +2,27 @@ name: Verify Default Branding Fix
 
 on:
   push:
-    branches: [fix-splash-apksigner-three-engines]
+    branches:
+      - fix-splash-apksigner-three-engines
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  default-branding-contract:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - name: Diagnose default branding assets
-        shell: bash
-        run: |
-          sha256sum assets/default-icon.png assets/default-splash.png
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          for (const file of ['assets/default-icon.png','assets/default-splash.png']) {
-            const b=fs.readFileSync(file);
-            console.log(`${file}: ${b.readUInt32BE(16)}x${b.readUInt32BE(20)} bytes=${b.length}`);
-          }
-          NODE
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Run default branding contract
         run: node scripts/test-default-branding-assets.mjs
+      - name: Run full regression suite
+        run: npm test
+      - name: Run syntax and static checks
+        run: npm run check
