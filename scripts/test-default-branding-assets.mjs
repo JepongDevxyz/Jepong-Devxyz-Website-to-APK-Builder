@@ -20,7 +20,7 @@ const EXPECTED={
   },
   splash:{
     encodedPath:path.join(ROOT,'assets/default-splash.base64.txt'),
-    sha256:'7f4ffe85700ef474abfa19b60e7b6293106dd1344e498be3f76308ea1a65a7a1',
+    sha256:'1e433717972f2a1ef719a1b16f8e085b6f6a5033961703ec60a2a2acb4f25868',
     width:270,
     height:480
   }
