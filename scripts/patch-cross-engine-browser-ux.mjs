@@ -11,11 +11,12 @@ import { patchCordovaExternalSchemes } from './patch-cordova-external-schemes.mj
 import { patchAndroidCleartextPolicy } from './patch-android-cleartext-policy.mjs';
 import { patchDeterministicAndroidSplash } from './android-splash-launcher.mjs';
 import { relocateAndroidSplashToAsset } from './relocate-android-splash-asset.mjs';
+import { patchAndroidSystemBars } from './patch-android-system-bars.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
 function androidAppRoot(cfg,projectDir){
-  if(cfg?.engine==='native'){
+  if(cfg?.engine==='native' || cfg?.engine==='gecko'){
     return path.join(projectDir,'app');
   }
   if(cfg?.engine==='capacitor'){
@@ -96,7 +97,7 @@ function normalizeMainActivityManifestForSplash(cfg,projectDir){
   if(
     !cfg ||
     cfg.splashEnabled===false ||
-    !['native','capacitor','cordova'].includes(cfg.engine)
+    !['native','gecko','capacitor','cordova'].includes(cfg.engine)
   ){
     return;
   }
@@ -147,7 +148,7 @@ function normalizeMainActivityManifestForSplash(cfg,projectDir){
 function preserveSplashWiringTrace(cfg,projectDir){
   if(
     !cfg ||
-    !['native','capacitor','cordova'].includes(cfg.engine)
+    !['native','gecko','capacitor','cordova'].includes(cfg.engine)
   ){
     return;
   }
@@ -186,5 +187,6 @@ export function patchCrossEngineBrowserUx(cfg,projectDir){
   patchDeterministicAndroidSplash(cfg,projectDir);
   relocateAndroidSplashToAsset(cfg,projectDir);
   preserveSplashWiringTrace(cfg,projectDir);
+  patchAndroidSystemBars(cfg,projectDir);
   return activityPath;
 }
