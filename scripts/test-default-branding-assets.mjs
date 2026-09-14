@@ -14,15 +14,15 @@ const ROOT=path.resolve(process.cwd());
 const EXPECTED={
   icon:{
     path:path.join(ROOT,'assets/default-icon.png'),
-    sha256:'488c2452f67ce6333cb4be7bb6c799c3d48adf423a32cc5211763a47c37f414b',
-    width:512,
-    height:512
+    sha256:'6ab9643daddf071d03f9f8ff62f6702e60d100a46343cfafcf554c3a0f6ecca5',
+    width:1536,
+    height:1536
   },
   splash:{
     path:path.join(ROOT,'assets/default-splash.png'),
-    sha256:'3426c958a1b57dc51c6e45725b95909a8729e397bdc6c17d7904d9c42f358fd3',
-    width:720,
-    height:1280
+    sha256:'c819f2aea8dddf1904046b79cd725c424aeb92ed34ba013c1a6a59fb86ad8087',
+    width:864,
+    height:1536
   }
 };
 
