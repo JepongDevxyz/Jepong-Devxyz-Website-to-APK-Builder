@@ -4,7 +4,7 @@ import path from 'node:path';
 export const ROOT = path.resolve(process.cwd());
 export function mkdir(p) { fs.mkdirSync(p, { recursive: true }); }
 export function write(p, s) { mkdir(path.dirname(p)); fs.writeFileSync(p, s); }
-export function escXml(s='') { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+export function escXml(s='') { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&apos;'); }
 export function javaString(s='') { return JSON.stringify(String(s)); }
 export function loadConfig(buildId) {
   const p = path.join(ROOT, 'builds', `${buildId}.json`);
@@ -21,8 +21,8 @@ export function dataUrlToAsset(dataUrl) {
 export function brandedAsset(cfg, kind) {
   const uploaded = dataUrlToAsset(kind === 'icon' ? cfg.iconDataUrl : cfg.splashDataUrl);
   if (uploaded) return uploaded;
-  const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.webp' : 'default-splash.webp');
+  const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.png' : 'default-splash.png');
   if (!fs.existsSync(fallback)) throw new Error(`Missing default ${kind} asset: ${fallback}`);
-  return { ext:'webp', buffer:fs.readFileSync(fallback) };
+  return { ext:'png', buffer:fs.readFileSync(fallback) };
 }
 export function selected(arr, name) { return Array.isArray(arr) && arr.includes(name); }
