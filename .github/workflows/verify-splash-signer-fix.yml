@@ -1,0 +1,26 @@
+name: Verify Splash Signer Fix
+
+on:
+  push:
+    branches:
+      - fix-splash-apksigner-three-engines
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  splash-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Run deterministic splash contract
+        run: node scripts/test-three-engine-splash-launcher.mjs
