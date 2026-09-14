@@ -13,6 +13,19 @@ import { patchDeterministicAndroidSplash } from './android-splash-launcher.mjs';
 
 export { patchCrossEngineBrowserUxSource };
 
+function androidAppRoot(cfg,projectDir){
+  if(cfg?.engine==='native'){
+    return path.join(projectDir,'app');
+  }
+  if(cfg?.engine==='capacitor'){
+    return path.join(projectDir,'android/app');
+  }
+  if(cfg?.engine==='cordova'){
+    return path.join(projectDir,'platforms/android/app');
+  }
+  return null;
+}
+
 function patchCapacitorVisitedHistory(cfg,projectDir){
   if(!cfg || cfg.engine!=='capacitor'){
     return;
@@ -78,21 +91,64 @@ function patchCapacitorVisitedHistory(cfg,projectDir){
   fs.writeFileSync(activityPath,source);
 }
 
-function preserveNativeSplashWiringTrace(cfg,projectDir){
-  if(!cfg || cfg.engine!=='native'){
+function normalizeMainActivityManifestForSplash(cfg,projectDir){
+  if(
+    !cfg ||
+    cfg.splashEnabled===false ||
+    !['native','capacitor','cordova'].includes(cfg.engine)
+  ){
     return;
   }
 
+  const appRoot=androidAppRoot(cfg,projectDir);
+  const manifestPath=path.join(
+    appRoot,
+    'src/main/AndroidManifest.xml'
+  );
+
+  if(!fs.existsSync(manifestPath)){
+    return;
+  }
+
+  let xml=fs.readFileSync(manifestPath,'utf8');
+  const selfClosing=/<activity\b[^>]*android:name="[^"]*MainActivity"[^>]*\/>/;
+  const match=xml.match(selfClosing);
+
+  if(!match){
+    return;
+  }
+
+  const openTag=match[0].replace(/\s*\/>$/,'>');
+  const expanded=`${openTag}
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>`;
+
+  xml=xml.replace(match[0],expanded);
+  fs.writeFileSync(manifestPath,xml);
+}
+
+function preserveSplashWiringTrace(cfg,projectDir){
+  if(
+    !cfg ||
+    !['native','capacitor','cordova'].includes(cfg.engine)
+  ){
+    return;
+  }
+
+  const appRoot=androidAppRoot(cfg,projectDir);
   const activityPath=path.join(
-    projectDir,
-    'app/src/main/java',
+    appRoot,
+    'src/main/java',
     ...String(cfg.packageName||'').split('.'),
     'MainActivity.java'
   );
 
   if(!fs.existsSync(activityPath)){
     throw new Error(
-      `Native MainActivity missing for splash trace: ${activityPath}`
+      `${cfg.engine} MainActivity missing for splash trace: ${activityPath}`
     );
   }
 
@@ -112,7 +168,8 @@ export function patchCrossEngineBrowserUx(cfg,projectDir){
   patchWebViewStartup(cfg,projectDir);
   patchCapacitorVisitedHistory(cfg,projectDir);
   patchAndroidCleartextPolicy(cfg,projectDir);
+  normalizeMainActivityManifestForSplash(cfg,projectDir);
   patchDeterministicAndroidSplash(cfg,projectDir);
-  preserveNativeSplashWiringTrace(cfg,projectDir);
+  preserveSplashWiringTrace(cfg,projectDir);
   return activityPath;
 }
