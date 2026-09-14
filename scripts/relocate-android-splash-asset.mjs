@@ -4,6 +4,13 @@ import path from 'node:path';
 
 import { brandedAsset, mkdir, write } from './common.mjs';
 
+// Tiny transparent PNG kept only as a compile-safe compatibility resource.
+// The real branded splash is loaded from src/main/assets/jepong_splash.img at runtime.
+const COMPILE_SAFE_SPLASH_PNG=Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII=',
+  'base64'
+);
+
 function androidAppRoot(cfg,projectDir){
   if(cfg?.engine==='native' || cfg?.engine==='gecko'){
     return path.join(projectDir,'app');
@@ -99,6 +106,12 @@ function removeCompiledSplashCopies(appRoot,splashHash){
   return removedNames;
 }
 
+function writeCompileSafeSplashResource(appRoot){
+  const drawableDir=path.join(appRoot,'src/main/res/drawable-nodpi');
+  mkdir(drawableDir);
+  write(path.join(drawableDir,'app_splash.png'),COMPILE_SAFE_SPLASH_PNG);
+}
+
 export function relocateAndroidSplashToAsset(cfg,projectDir){
   if(!cfg || !['native','gecko','capacitor','cordova'].includes(cfg.engine)){
     return false;
@@ -116,8 +129,11 @@ export function relocateAndroidSplashToAsset(cfg,projectDir){
 
   patchJavaSplashLoads(appRoot);
   removeCompiledSplashCopies(appRoot,splashHash);
+  writeCompileSafeSplashResource(appRoot);
 
-  // Fail early if generated Java would still require the removed resource.
+  // Fail early if generated Java would still require the full branded bitmap
+  // as a compiled drawable. The compatibility app_splash.png above is tiny
+  // and safe for AAPT2; the real branded image is always loaded from assets.
   let staleReference='';
   walk(path.join(appRoot,'src/main/java'),file=>{
     if(staleReference || !file.endsWith('.java'))return;
