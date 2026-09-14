@@ -1,0 +1,101 @@
+name: Verify Current APK Signing
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/verify-current-apks-signing.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  sign-verify:
+    name: Sign verify ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [native, gecko, capacitor, cordova]
+    env:
+      SOURCE_RUN_ID: '34850918108'
+      EXPECTED_SIGNER_SHA256: f5e197d89410cb681acc9cd803f277e06c05ac2fa843adb9603fc3b4fdb1c3a2
+      APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+      APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+      APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+      APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+
+    steps:
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install signing tools
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'build-tools;36.0.0'
+
+      - name: Download freshly verified APK
+        uses: actions/download-artifact@v7
+        with:
+          name: verified-${{ matrix.engine }}-apk
+          path: input-apk
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Production sign and apksigner verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in APK_KEYSTORE_BASE64 APK_KEYSTORE_PASSWORD APK_KEY_ALIAS APK_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required repository secret: $name" >&2
+              exit 1
+            fi
+          done
+
+          RAW_APK="$(find input-apk -type f -name '*.apk' | head -n 1)"
+          if [ -z "$RAW_APK" ]; then
+            echo 'No APK found in downloaded artifact' >&2
+            exit 1
+          fi
+
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > production.jks
+          "$ZIPALIGN" -f 4 "$RAW_APK" aligned.apk
+          "$APKSIGNER" sign \
+            --ks production.jks \
+            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
+            --ks-key-alias "$APK_KEY_ALIAS" \
+            --key-pass "pass:$APK_KEY_PASSWORD" \
+            --out signed.apk \
+            aligned.apk
+
+          "$ZIPALIGN" -c -v 4 signed.apk
+          "$APKSIGNER" verify --verbose --print-certs signed.apk | tee apksigner-verify.txt
+
+          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' apksigner-verify.txt | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          if [ -z "$ACTUAL" ]; then
+            echo 'Could not read signer certificate SHA-256 digest' >&2
+            exit 1
+          fi
+          if [ "$ACTUAL" != "$EXPECTED_SIGNER_SHA256" ]; then
+            echo "Signer certificate mismatch: $ACTUAL" >&2
+            exit 1
+          fi
+          echo "Verified production signer SHA-256: $ACTUAL"
+
+      - name: Upload production-signed verified APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-signed-${{ matrix.engine }}-apk
+          path: signed.apk
+          if-no-files-found: error
