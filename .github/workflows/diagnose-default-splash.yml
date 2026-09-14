@@ -1,0 +1,31 @@
+name: Diagnose Default Splash PNG
+
+on:
+  push:
+    branches: [fix-splash-apksigner-three-engines]
+    paths:
+      - '.github/workflows/diagnose-default-splash.yml'
+      - 'scripts/diagnose-default-splash.mjs'
+      - 'assets/default-splash.png'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: File identification
+        shell: bash
+        run: |
+          set -x
+          file assets/default-splash.png
+          command -v identify >/dev/null && identify -verbose assets/default-splash.png | head -n 80 || true
+      - name: Dump PNG structure
+        run: node scripts/diagnose-default-splash.mjs
