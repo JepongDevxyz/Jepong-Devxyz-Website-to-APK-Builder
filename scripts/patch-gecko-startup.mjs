@@ -70,8 +70,8 @@ export function patchGeckoActivitySource(source) {
   out=replaceOnce(
     out,
     `  boolean started=false;\n\n  AtomicInteger extensionDone=`,
-    `  boolean started=false;\n  boolean waitingForInitialWebsitePaint=false;\n\n  AtomicInteger extensionDone=`,
-    'first-paint state'
+    `  boolean started=false;\n  boolean waitingForInitialWebsitePaint=false;\n  boolean extensionSetupActive=false;\n  boolean websitePreloadStarted=false;\n  boolean websiteReadyBehindExtensions=false;\n\n  AtomicInteger extensionDone=`,
+    'startup concurrency state'
   );
 
   const crashMarker=`        @Override
@@ -91,8 +91,12 @@ export function patchGeckoActivitySource(source) {
           }
 
           waitingForInitialWebsitePaint=false;
+          websiteReadyBehindExtensions=true;
           cancelWebsiteTimeout();
-          finishLoader();
+
+          if(!extensionSetupActive){
+            finishLoader();
+          }
         }
 
 ${crashMarker}`,
@@ -121,7 +125,10 @@ ${crashMarker}`,
           boolean success
         ){
           if(success){
-            if(waitingForInitialWebsitePaint){
+            if(
+              waitingForInitialWebsitePaint &&
+              !extensionSetupActive
+            ){
               runOnUiThread(()->{
                 loadingStatus.setText(
                   "Rendering website..."
@@ -131,7 +138,7 @@ ${crashMarker}`,
                   "Waiting for first paint"
                 );
               });
-            }else{
+            }else if(!waitingForInitialWebsitePaint){
               cancelWebsiteTimeout();
             }
           }else{
@@ -155,8 +162,15 @@ ${crashMarker}`,
     `
 
       }else{`,
-    `        loadWebsite();`,
-    'redundant extension re-list delay'
+    `        extensionSetupActive=false;
+        hideActionButtons();
+
+        if(websiteReadyBehindExtensions){
+          finishLoader();
+        }else{
+          showWebsiteLoader();
+        }`,
+    'extension completion reveals preloaded website'
   );
 
   out=replaceOnce(
@@ -164,9 +178,56 @@ ${crashMarker}`,
     `          hideActionButtons();
           hideExtensionLoader();
           loadWebsite();`,
-    `          hideActionButtons();
-          loadWebsite();`,
-    'continue transition loader continuity'
+    `          extensionSetupActive=false;
+          hideActionButtons();
+
+          if(websiteReadyBehindExtensions){
+            finishLoader();
+          }else{
+            showWebsiteLoader();
+          }`,
+    'continue reveals preloaded website'
+  );
+
+  const prepareMarker=`  void prepareExtensions(
+    WebExtensionController controller
+  ){`;
+
+  out=replaceOnce(
+    out,
+    prepareMarker,
+    `  void preloadWebsiteForExtensionSetup(){
+    if(
+      session==null ||
+      websitePreloadStarted
+    ){
+      return;
+    }
+
+    websitePreloadStarted=true;
+    websiteReadyBehindExtensions=false;
+    waitingForInitialWebsitePaint=true;
+    beginWebsiteTimeout();
+    session.loadUri(HOME);
+  }
+
+${prepareMarker}`,
+    'background website preload helper'
+  );
+
+  out=replaceOnce(
+    out,
+    `    if(keys.isEmpty()){
+      loadingBar.setProgress(80);`,
+    `    if(!keys.isEmpty()){
+      extensionSetupActive=true;
+      showExtensionLoader();
+      preloadWebsiteForExtensionSetup();
+    }
+
+    if(keys.isEmpty()){
+      loadingBar.setProgress(80);`,
+    'extension setup starts website preload'
   );
 
   out=replaceOnce(
@@ -180,6 +241,8 @@ ${crashMarker}`,
         "Starting GeckoView"
       );
 
+      websitePreloadStarted=true;
+      websiteReadyBehindExtensions=false;
       waitingForInitialWebsitePaint=true;
       beginWebsiteTimeout();
       session.loadUri(HOME);`,
@@ -200,6 +263,7 @@ ${crashMarker}`,
     runOnUiThread(()->{
 
       waitingForInitialWebsitePaint=false;
+      websiteReadyBehindExtensions=false;
       cancelWebsiteTimeout();`,
     'website error state reset'
   );
