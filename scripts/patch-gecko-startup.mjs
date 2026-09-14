@@ -91,12 +91,8 @@ export function patchGeckoActivitySource(source) {
           }
 
           waitingForInitialWebsitePaint=false;
-          websiteReadyBehindExtensions=true;
           cancelWebsiteTimeout();
-
-          if(!extensionSetupActive){
-            finishLoader();
-          }
+          finishLoader();
         }
 
 ${crashMarker}`,
@@ -125,10 +121,7 @@ ${crashMarker}`,
           boolean success
         ){
           if(success){
-            if(
-              waitingForInitialWebsitePaint &&
-              !extensionSetupActive
-            ){
+            if(waitingForInitialWebsitePaint){
               runOnUiThread(()->{
                 loadingStatus.setText(
                   "Rendering website..."
@@ -138,7 +131,7 @@ ${crashMarker}`,
                   "Waiting for first paint"
                 );
               });
-            }else if(!waitingForInitialWebsitePaint){
+            }else{
               cancelWebsiteTimeout();
             }
           }else{
@@ -207,6 +200,12 @@ ${crashMarker}`,
     websitePreloadStarted=true;
     websiteReadyBehindExtensions=false;
     waitingForInitialWebsitePaint=true;
+
+    android.util.Log.i(
+      "JepongGecko",
+      "Preloading website while extensions are prepared"
+    );
+
     beginWebsiteTimeout();
     session.loadUri(HOME);
   }
@@ -266,6 +265,20 @@ ${prepareMarker}`,
       websiteReadyBehindExtensions=false;
       cancelWebsiteTimeout();`,
     'website error state reset'
+  );
+
+  out=replaceOnce(
+    out,
+    `  void finishLoader(){
+    runOnUiThread(()->{`,
+    `  void finishLoader(){
+    if(extensionSetupActive){
+      websiteReadyBehindExtensions=true;
+      return;
+    }
+
+    runOnUiThread(()->{`,
+    'extension loader stays visible over preloaded website'
   );
 
   const enqueueMarker=`  void enqueueDownload(
