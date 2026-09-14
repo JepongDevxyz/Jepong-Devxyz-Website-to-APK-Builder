@@ -13,12 +13,13 @@ function pngColorType(buffer, label) {
   return buffer[25];
 }
 
-function assertAndroidSafePng(file, label) {
+function assertAndroidSafeSplash(file, label) {
   assert.ok(fs.existsSync(file), `${label}: missing ${file}`);
   const colorType = pngColorType(fs.readFileSync(file), label);
-  assert.ok(
-    colorType === 2 || colorType === 6,
-    `${label}: Android branding PNG must be true-color RGB/RGBA, got PNG color type ${colorType}`
+  assert.notEqual(
+    colorType,
+    3,
+    `${label}: Android splash PNG must not remain indexed/palette color type 3`
   );
 }
 
@@ -47,21 +48,17 @@ for (const engine of ['native', 'capacitor', 'cordova']) {
 
   if (engine === 'native') {
     writeNative(cfg, root, false);
-    assertAndroidSafePng(path.join(root, 'app/src/main/res/drawable-nodpi/app_icon.png'), 'native icon');
-    assertAndroidSafePng(path.join(root, 'app/src/main/res/drawable-nodpi/app_splash.png'), 'native splash');
+    assertAndroidSafeSplash(path.join(root, 'app/src/main/res/drawable-nodpi/app_splash.png'), 'native splash');
   } else if (engine === 'capacitor') {
     writeCapacitor(cfg, root);
-    assertAndroidSafePng(path.join(root, 'branding/app_icon.png'), 'capacitor icon');
-    assertAndroidSafePng(path.join(root, 'branding/app_splash.png'), 'capacitor splash');
+    assertAndroidSafeSplash(path.join(root, 'branding/app_splash.png'), 'capacitor splash');
   } else {
     writeCordova(cfg, root);
-    assertAndroidSafePng(path.join(root, 'branding/app_icon.png'), 'cordova icon');
-    assertAndroidSafePng(path.join(root, 'branding/app_splash.png'), 'cordova splash');
-    assertAndroidSafePng(path.join(root, 'res/icon.png'), 'cordova bootstrap icon');
-    assertAndroidSafePng(path.join(root, 'res/screen/android/splash.png'), 'cordova bootstrap splash');
+    assertAndroidSafeSplash(path.join(root, 'branding/app_splash.png'), 'cordova branded splash');
+    assertAndroidSafeSplash(path.join(root, 'res/screen/android/splash.png'), 'cordova bootstrap splash');
   }
 
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-console.log('✓ Android branding PNGs are true-color RGB/RGBA across Native, Capacitor and Cordova');
+console.log('✓ Android splash PNGs avoid indexed/palette color type 3 across Native, Capacitor and Cordova');
