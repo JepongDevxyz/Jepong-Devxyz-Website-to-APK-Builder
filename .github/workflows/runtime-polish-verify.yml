@@ -20,3 +20,174 @@ jobs:
         run: npm test
       - name: Run syntax checks
         run: npm run check
+
+  build:
+    name: Build + sign ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [native, gecko, capacitor, cordova]
+    env:
+      ENGINE: ${{ matrix.engine }}
+      BUILD_ID: runtime-polish-${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21 for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Java 17
+        if: matrix.engine != 'capacitor'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          if [ "$ENGINE" = "gecko" ]; then
+            sdkmanager "platform-tools" "platforms;android-37.1" "build-tools;37.0.0" "build-tools;36.0.0"
+          else
+            sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          fi
+
+      - name: Create physical-test-equivalent config
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source=JSON.parse(fs.readFileSync('builds/jpx-mu1jy6u4-d26394.json','utf8'));
+          source.engine=process.env.ENGINE;
+          source.buildId=process.env.BUILD_ID;
+          source.createdAt=new Date().toISOString();
+          source.splashEnabled=true;
+          source.splashDuration=6000;
+          source.apkSigner=true;
+          if(source.engine!=='gecko'){
+            source.extensions=[];
+            source.sizeOptimization=false;
+            source.abiTarget='universal';
+          }
+          fs.writeFileSync(`builds/${process.env.BUILD_ID}.json`,JSON.stringify(source,null,2));
+          NODE
+
+      - name: Generate project
+        run: |
+          node scripts/build.mjs prepare --build-id "$BUILD_ID"
+          node scripts/build.mjs generate --build-id "$BUILD_ID"
+
+      - name: Setup Gradle 9.6 for Native/Gecko
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Build Native/Gecko
+        if: matrix.engine == 'native' || matrix.engine == 'gecko'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          gradle --no-daemon :app:assembleRelease --stacktrace
+
+      - name: Setup Gradle for Capacitor
+        if: matrix.engine == 'capacitor'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Build Capacitor
+        if: matrix.engine == 'capacitor'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cap add android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine capacitor
+          cd "work/$BUILD_ID/project/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease --stacktrace
+
+      - name: Setup Gradle for Cordova
+        if: matrix.engine == 'cordova'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.2'
+
+      - name: Build Cordova
+        if: matrix.engine == 'cordova'
+        shell: bash
+        run: |
+          cd "work/$BUILD_ID/project"
+          npm install --no-audit --no-fund
+          npx cordova platform add android@15.1.0
+          npx cordova prepare android
+          cd "$GITHUB_WORKSPACE"
+          node scripts/patch-android-platform.mjs --build-id "$BUILD_ID" --engine cordova
+          cd "work/$BUILD_ID/project/platforms/android"
+          gradle --no-daemon assembleRelease --stacktrace
+
+      - name: Locate APK
+        id: apk
+        shell: bash
+        run: |
+          APK="$(node scripts/build.mjs locate-apk --build-id "$BUILD_ID" | tail -n 1)"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          test -s "$APK"
+          ls -lh "$APK"
+
+      - name: Align, production-sign, and verify APK
+        shell: bash
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APK="${{ steps.apk.outputs.apk }}"
+          ALIGNED="${APK%.apk}-aligned.apk"
+          SIGNED="${APK%.apk}-signed.apk"
+          KEYSTORE="$RUNNER_TEMP/jepong-signing.jks"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name zipalign | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+          test -n "${APK_KEYSTORE_BASE64:-}"
+          test -n "${APK_KEYSTORE_PASSWORD:-}"
+          test -n "${APK_KEY_ALIAS:-}"
+          test -n "${APK_KEY_PASSWORD:-}"
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          "$ZIPALIGN" -f -p 4 "$APK" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$APK_KEY_ALIAS" \
+            --ks-pass "pass:$APK_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$APK_KEY_PASSWORD" \
+            --out "$SIGNED" \
+            "$ALIGNED"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED"
+          mv "$SIGNED" "$APK"
+          rm -f "$ALIGNED" "$KEYSTORE"
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-polish-${{ matrix.engine }}
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 7
