@@ -266,10 +266,10 @@ jobs:
             adb shell am force-stop "$PACKAGE_NAME"
             adb shell am start -W -n "$PACKAGE_NAME/.JepongSplashActivity"
             sleep 2
-            adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' | tee "dist/$ENGINE/runtime/top-during-splash.txt" | grep -q 'JepongSplashActivity'
+            adb shell dumpsys activity top | tee "dist/$ENGINE/runtime/activity-top-during.txt" | grep -q "${PACKAGE_NAME}/.JepongSplashActivity"
             adb exec-out screencap -p > "dist/$ENGINE/runtime/splash-during.png"
             sleep 5
-            adb shell dumpsys activity activities | grep -m1 'mResumedActivity' | tr -d '\r' | tee "dist/$ENGINE/runtime/top-after-splash.txt" | grep -q 'MainActivity'
+            adb shell dumpsys activity top | tee "dist/$ENGINE/runtime/activity-top-after.txt" | grep -q "${PACKAGE_NAME}/.MainActivity"
             adb exec-out screencap -p > "dist/$ENGINE/runtime/after-splash.png"
             cp "dist/$ENGINE/aapt2-badging.txt" "dist/$ENGINE/runtime/launchable-activity.txt"
             echo "API 35 splash lifecycle verified for $ENGINE"
