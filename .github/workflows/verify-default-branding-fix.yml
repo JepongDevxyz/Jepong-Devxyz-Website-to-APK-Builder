@@ -20,6 +20,8 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Diagnose branding PNG chunks
+        run: node scripts/diagnose-default-splash.mjs
       - name: Run default branding contract
         run: node scripts/test-default-branding-assets.mjs
       - name: Run full regression suite
