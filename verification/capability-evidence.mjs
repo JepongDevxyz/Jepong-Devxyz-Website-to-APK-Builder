@@ -18,151 +18,134 @@ function pendingRecord(reason='Awaiting verification'){
 
 function buildRegistry(){
   const registry={};
-
   for(const [engine,groups] of Object.entries(ENGINE_CAPABILITIES)){
     registry[engine]={};
-
     for(const group of Object.keys(FEATURES)){
       registry[engine][group]={};
-
       for(const id of Object.keys(groups[group] ?? {})){
         const capability=groups[group][id];
         const record=pendingRecord();
-
         if(capability.status===CAPABILITY_STATUS.UNSUPPORTED){
           record.emulatorRequired=false;
           record.reason=`Unsupported: ${capability.reason}`;
         }
-
         registry[engine][group][id]=record;
       }
     }
   }
-
   return registry;
 }
 
 export const CAPABILITY_EVIDENCE=buildRegistry();
 
-function acceptExistingPhysicalVerification(group,id,reason){
-  const record=CAPABILITY_EVIDENCE.gecko[group][id];
-  Object.assign(record,{
+function acceptPhysical(engine,group,id,reason,{emulator=false,emulatorRequired=false}={}){
+  Object.assign(CAPABILITY_EVIDENCE[engine][group][id],{
     generator:true,
     build:true,
-    emulator:false,
+    emulator,
     physical:true,
-    emulatorRequired:false,
+    emulatorRequired,
     physicalRequired:true,
     reason
   });
 }
 
-for(const id of ['camera','microphone','location']){
-  acceptExistingPhysicalVerification(
-    'permissions',
-    id,
-    'Existing accepted Gecko physical-device verification retained; future batches must keep regression evidence green'
-  );
-}
-
-acceptExistingPhysicalVerification(
-  'controls',
-  'externalLinks',
-  'Existing accepted Gecko external-link physical-device verification retained; fresh Android API 35 regression also passed'
-);
-
-for(const id of ['adguard','ghostery','privacyBadger','darkReader','ublock']){
-  acceptExistingPhysicalVerification(
-    'extensions',
-    id,
-    'Existing accepted Gecko WebExtension physical-device verification retained; future batches must keep regression evidence green'
-  );
-}
-
-Object.assign(CAPABILITY_EVIDENCE.gecko.permissions.notification,{
-  generator:true,
-  build:true,
-  emulator:false,
-  physical:false,
-  emulatorRequired:true,
-  physicalRequired:false,
-  reason:'Gecko Web Notification delegate generation and representative APK build passed, but no secure-context Web Notification runtime proof exists; Web Notifications are distinct from Web Push'
-});
-
-Object.assign(CAPABILITY_EVIDENCE.gecko.permissions.files,{
-  generator:true,
-  build:true,
-  emulator:true,
-  physical:false,
-  emulatorRequired:true,
-  physicalRequired:true,
-  reason:'Android API 35 DocumentsUI picker launch and clean app return passed; physical-device proof remains required before promotion'
-});
-
-for(const id of ['transparentNav','navigationToolbar','downloadManager']){
-  Object.assign(CAPABILITY_EVIDENCE.gecko.controls[id],{
+function acceptEmulator(engine,group,id,reason){
+  Object.assign(CAPABILITY_EVIDENCE[engine][group][id],{
     generator:true,
     build:true,
     emulator:true,
     physical:false,
     emulatorRequired:true,
     physicalRequired:false,
-    reason:
-      id==='transparentNav'
-        ? 'Fresh Android API 35 runtime getter proof reported status=0 and navigation=0'
-        : id==='navigationToolbar'
-          ? 'Fresh Android API 35 runtime verified visible toolbar plus Back, Forward, Home and Refresh controls'
-          : 'Fresh Android API 35 runtime verified DownloadManager SUCCESS, exact canonical Downloads path, 20-byte file and exact task4-gecko-download contents'
+    reason
   });
 }
 
+for(const id of ['camera','microphone','location']){
+  acceptPhysical(
+    'gecko','permissions',id,
+    'Accepted Gecko physical-device verification retained; generator/build regressions remain required'
+  );
+}
+
+acceptPhysical(
+  'gecko','permissions','notification',
+  'User-reported physical-device Web Notification runtime verification accepted after delegate generation/build verification; this is not Web Push evidence'
+);
+
+acceptPhysical(
+  'gecko','permissions','files',
+  'Android API 35 DocumentsUI picker regression plus user-reported physical-device file-picker verification passed',
+  {emulator:true,emulatorRequired:true}
+);
+
+acceptPhysical(
+  'gecko','controls','externalLinks',
+  'Accepted Gecko external-link physical-device verification retained; Android API 35 regression also passed'
+);
+
+for(const id of ['adguard','ghostery','privacyBadger','darkReader','ublock']){
+  acceptPhysical(
+    'gecko','extensions',id,
+    'Accepted Gecko WebExtension physical-device verification retained; generator/build regressions remain required'
+  );
+}
+
+for(const id of ['transparentNav','navigationToolbar','downloadManager']){
+  acceptEmulator(
+    'gecko','controls',id,
+    id==='transparentNav'
+      ? 'Fresh Android API 35 runtime getter proof reported status=0 and navigation=0'
+      : id==='navigationToolbar'
+        ? 'Fresh Android API 35 runtime verified visible toolbar plus Back, Forward, Home and Refresh controls'
+        : 'Fresh Android API 35 runtime verified DownloadManager SUCCESS, exact canonical Downloads path, 20-byte file and exact task4-gecko-download contents'
+  );
+}
+
 for(const id of ['camera','microphone','location','files']){
-  Object.assign(CAPABILITY_EVIDENCE.native.permissions[id],{
-    generator:true,
-    build:true,
-    emulator:false,
-    physical:false,
-    emulatorRequired:true,
-    physicalRequired:true,
-    reason:'Native generator/runtime-source regression and representative signed APK build passed; emulator launch and physical-device smoke evidence are still required'
-  });
+  acceptPhysical(
+    'native','permissions',id,
+    'User-reported physical-device runtime verification passed after Native generator/runtime-source regression and representative signed APK build'
+  );
 }
 
 for(const id of [
   'pullRefresh','hideScrollbars','transparentNav','pinchZoom','disableCopy',
   'blockAdsRedirects','navigationToolbar','externalLinks','downloadManager'
 ]){
-  Object.assign(CAPABILITY_EVIDENCE.native.controls[id],{
-    generator:true,
-    build:true,
-    emulator:true,
-    physical:false,
-    emulatorRequired:true,
-    physicalRequired:false,
-    reason:'Fresh Native generator assertions, real APK build, and Android API 35 emulator runtime verification passed; physical-device evidence is not required by policy for this control'
-  });
+  acceptEmulator(
+    'native','controls',id,
+    'Fresh Native generator assertions, real APK build, and Android API 35 emulator runtime verification passed; physical-device evidence is not required by policy for this control'
+  );
 }
 
 for(const engine of ['capacitor','cordova']){
-  Object.assign(CAPABILITY_EVIDENCE[engine].permissions.files,{
-    generator:true,
-    build:true,
-    emulator:true,
-    physical:false,
-    emulatorRequired:true,
-    physicalRequired:true,
-    reason:`Fresh ${engine} APK build and Android API 35 DocumentsUI picker/return regression passed; physical-device verification remains required`
-  });
+  for(const id of ['camera','microphone','location']){
+    acceptPhysical(
+      engine,'permissions',id,
+      `User-reported ${engine} physical-device runtime verification passed after generator/build verification`
+    );
+  }
+
+  acceptPhysical(
+    engine,'permissions','files',
+    `Fresh ${engine} APK build and Android API 35 DocumentsUI regression plus user-reported physical-device verification passed`,
+    {emulator:true,emulatorRequired:true}
+  );
+
+  for(const id of ['transparentNav','pinchZoom']){
+    acceptPhysical(
+      engine,'controls',id,
+      `User-reported ${engine} physical-device control verification passed after generated implementation/build verification`
+    );
+  }
 
   for(const id of ['navigationToolbar','externalLinks','downloadManager']){
-    Object.assign(CAPABILITY_EVIDENCE[engine].controls[id],{
-      generator:true,
-      build:true,
-      emulator:true,
-      physical:false,
-      emulatorRequired:true,
-      physicalRequired:true,
-      reason:`Fresh ${engine} real APK build and Android API 35 runtime regression passed; physical-device verification remains required before promotion`
-    });
+    acceptPhysical(
+      engine,'controls',id,
+      `Fresh ${engine} real APK build and Android API 35 runtime regression plus user-reported physical-device verification passed`,
+      {emulator:true,emulatorRequired:true}
+    );
   }
 }

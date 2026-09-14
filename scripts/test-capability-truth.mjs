@@ -12,7 +12,7 @@ import {
   isCapabilityVerificationComplete
 } from '../verification/capability-verification.mjs';
 
-const {VERIFIED,EXPERIMENTAL,UNSUPPORTED}=CAPABILITY_STATUS;
+const {VERIFIED,UNSUPPORTED}=CAPABILITY_STATUS;
 const engines=['native','gecko','capacitor','cordova'];
 
 const bridgeOnlyPermissions=[
@@ -44,14 +44,17 @@ for(const engine of ['native','capacitor','cordova']){
 
 {
   const notification=getCapability('gecko','permissions','notification');
-  if(notification.status!==EXPERIMENTAL){
-    throw new Error('gecko notification must remain Experimental');
+  if(notification.status!==VERIFIED){
+    throw new Error('gecko Web Notification must be Verified after accepted physical-device runtime proof');
   }
-  if(!notification.compileVerified){
-    throw new Error('gecko notification compile verification is stale');
+  if(!notification.compileVerified || !notification.runtimeVerified){
+    throw new Error('gecko Web Notification verification metadata is stale');
   }
-  if(notification.runtimeVerified){
-    throw new Error('gecko notification cannot be runtime Verified yet');
+  if(!isCapabilityVerificationComplete('gecko','permissions','notification')){
+    throw new Error('gecko Web Notification independent evidence is incomplete');
+  }
+  if(/web push support/i.test(notification.reason) && !/not|does not/i.test(notification.reason)){
+    throw new Error('gecko Web Notification verification must not imply Web Push support');
   }
 }
 
