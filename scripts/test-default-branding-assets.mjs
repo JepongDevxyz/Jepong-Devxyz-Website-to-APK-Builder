@@ -13,16 +13,16 @@ const ROOT=path.resolve(process.cwd());
 
 const EXPECTED={
   icon:{
-    path:path.join(ROOT,'assets/default-icon.png'),
+    sourcePath:path.join(ROOT,'assets/default-icon.png'),
     sha256:'61d47cb6d913f404bd6287485762db115907a7b1221243c73780e4d6bae0fee2',
     width:256,
     height:256
   },
   splash:{
-    path:path.join(ROOT,'assets/default-splash.png'),
-    sha256:'c3117fe7dc6faa1a0dc338ac06b2f4018111f23215c2d89af78842da9ab3a805',
-    width:270,
-    height:480
+    encodedPath:path.join(ROOT,'assets/default-splash.base64.txt'),
+    sha256:'971bc365446b61f3aa46113ad2e17939fe2347999aae0288873dee0030f33bac',
+    width:72,
+    height:128
   }
 };
 
@@ -39,16 +39,20 @@ function pngSize(buffer,label){
   return { width:buffer.readUInt32BE(16), height:buffer.readUInt32BE(20) };
 }
 
-for(const [kind,spec] of Object.entries(EXPECTED)){
-  const buffer=fs.readFileSync(spec.path);
-  const size=pngSize(buffer,kind);
-  assert.equal(sha256(buffer),spec.sha256,`${kind}: unexpected default asset`);
-  assert.equal(size.width,spec.width,`${kind}: unexpected width`);
-  assert.equal(size.height,spec.height,`${kind}: unexpected height`);
+const iconSource=fs.readFileSync(EXPECTED.icon.sourcePath);
+assert.equal(sha256(iconSource),EXPECTED.icon.sha256,'icon: unexpected default asset');
 
+const encodedSplash=fs.readFileSync(EXPECTED.splash.encodedPath,'utf8').trim();
+const splashSource=Buffer.from(encodedSplash,'base64');
+assert.equal(sha256(splashSource),EXPECTED.splash.sha256,'splash: unexpected decoded default payload');
+
+for(const [kind,spec] of Object.entries(EXPECTED)){
   const fallback=brandedAsset({},kind);
+  const size=pngSize(fallback.buffer,kind);
   assert.equal(fallback.ext,'png',`${kind}: fallback extension must be PNG`);
   assert.equal(sha256(fallback.buffer),spec.sha256,`${kind}: brandedAsset fallback drifted`);
+  assert.equal(size.width,spec.width,`${kind}: unexpected width`);
+  assert.equal(size.height,spec.height,`${kind}: unexpected height`);
 }
 
 const baseConfig={
@@ -110,4 +114,4 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   fs.rmSync(root,{recursive:true,force:true});
 }
 
-console.log('✓ Jepong Devxyz default branding propagates to all four engines');
+console.log('✓ Jepong Devxyz default branding propagates Android-safe PNGs to all four engines');

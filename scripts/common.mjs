@@ -18,11 +18,24 @@ export function dataUrlToAsset(dataUrl) {
   if (!m) return null;
   return { ext: m[1].toLowerCase()==='jpeg'?'jpg':m[1].toLowerCase(), buffer: Buffer.from(m[2], 'base64') };
 }
+function defaultBrandingAsset(kind) {
+  if (kind === 'icon') {
+    const icon = path.join(ROOT, 'assets', 'default-icon.png');
+    if (!fs.existsSync(icon)) throw new Error(`Missing default icon asset: ${icon}`);
+    return { ext:'png', buffer:fs.readFileSync(icon) };
+  }
+
+  const encoded = path.join(ROOT, 'assets', 'default-splash.base64.txt');
+  if (!fs.existsSync(encoded)) throw new Error(`Missing default splash payload: ${encoded}`);
+  const buffer = Buffer.from(fs.readFileSync(encoded, 'utf8').trim(), 'base64');
+  const signature = buffer.subarray(0, 8);
+  const expected = Buffer.from([137,80,78,71,13,10,26,10]);
+  if (!signature.equals(expected)) throw new Error('Default splash payload did not decode to a PNG');
+  return { ext:'png', buffer };
+}
 export function brandedAsset(cfg, kind) {
   const uploaded = dataUrlToAsset(kind === 'icon' ? cfg.iconDataUrl : cfg.splashDataUrl);
   if (uploaded) return uploaded;
-  const fallback = path.join(ROOT, 'assets', kind === 'icon' ? 'default-icon.png' : 'default-splash.png');
-  if (!fs.existsSync(fallback)) throw new Error(`Missing default ${kind} asset: ${fallback}`);
-  return { ext:'png', buffer:fs.readFileSync(fallback) };
+  return defaultBrandingAsset(kind);
 }
 export function selected(arr, name) { return Array.isArray(arr) && arr.includes(name); }
