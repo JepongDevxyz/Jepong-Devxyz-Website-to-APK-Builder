@@ -48,7 +48,8 @@ try{
   const splash=findExpected(entries,'splash');
   const report={status:icon.matching.length===1&&splash.matching.length===1?'verified':'failed',apk:path.resolve(apk),engine,
     icon:{expectedSha256:expected.icon,allowedEntries:icon.allowed,presentEntries:icon.present,matchingEntries:icon.matching},
-    splash:{expectedSha256:expected.splash,allowedEntries:splash.allowed,presentEntries:splash.present,matchingEntries:splash.matching}};
+    splash:{expectedSha256:expected.splash,allowedEntries:splash.allowed,presentEntries:splash.present,matchingEntries:splash.matching},
+    diagnosticEntries:entries.filter(entry=>/icon|launcher/i.test(entry)).slice(0,100)};
   if(report.status!=='verified'){
     const failures=[];
     if(icon.present.length!==1) failures.push('icon path'); else if(icon.matching.length!==1) failures.push('icon bytes');
