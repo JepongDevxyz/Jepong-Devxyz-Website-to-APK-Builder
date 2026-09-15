@@ -22,9 +22,11 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   const result=run(makeZip(`verified-${engine}`,validFiles()),engine);
   assert.equal(result.status,0,`${engine}: ${result.stderr}`); assert.equal(JSON.parse(result.stdout).status,'verified');
 }
+const compiledPath=run(makeZip('verified-compiled-path',{'res/drawable-nodpi-v4/app_icon.png':icon,'assets/jepong_splash.img':splash}));
+assert.equal(compiledPath.status,0,`compiled drawable path should be accepted: ${compiledPath.stderr}`);
 const wrongSplash=run(makeZip('wrong-splash',{...validFiles(),'assets/jepong_splash.img':Buffer.from('wrong-splash')}));
 assert.notEqual(wrongSplash.status,0,'wrong splash bytes must fail'); assert.match(wrongSplash.stderr,/splash bytes/i);
-const missingPath=run(makeZip('missing-path',{'res/drawable/app_icon.png':icon,'assets/jepong_splash.img':splash}));
+const missingPath=run(makeZip('missing-path',{'res/mipmap-hdpi/app_icon.png':icon,'assets/jepong_splash.img':splash}));
 assert.notEqual(missingPath.status,0,'unexpected icon path must fail'); assert.match(missingPath.stderr,/icon path/i);
 const malformed=path.join(sandbox,'malformed.apk'); fs.writeFileSync(malformed,Buffer.from('not a zip archive'));
 const malformedResult=run(malformed); assert.notEqual(malformedResult.status,0,'malformed archive must fail closed'); assert.match(malformedResult.stderr,/unable to read APK archive/i);

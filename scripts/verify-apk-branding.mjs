@@ -17,10 +17,10 @@ if(!fs.existsSync(apk)){ console.error(`APK not found: ${apk}`); process.exit(2)
 // shared Android patch. The selected splash is relocated to app assets so
 // AAPT2 never compiles the full branded image.
 const EXPECTED_PATHS={
-  native:{icon:['res/drawable-nodpi/app_icon.png'],splash:['assets/jepong_splash.img']},
-  gecko:{icon:['res/drawable-nodpi/app_icon.png'],splash:['assets/jepong_splash.img']},
-  capacitor:{icon:['res/drawable-nodpi/app_icon.png'],splash:['assets/jepong_splash.img']},
-  cordova:{icon:['res/drawable-nodpi/app_icon.png'],splash:['assets/jepong_splash.img']}
+  native:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
+  gecko:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
+  capacitor:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
+  cordova:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']}
 };
 const expected={
   icon:crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT,'assets/default-icon.png'))).digest('hex'),
