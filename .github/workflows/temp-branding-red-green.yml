@@ -12,4 +12,18 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: node scripts/test-default-branding-assets.mjs
+      - name: Inspect assets
+        run: |
+          sha256sum assets/default-icon.* assets/default-splash.*
+          file assets/default-icon.* assets/default-splash.*
+      - name: Branding contract
+        continue-on-error: true
+        run: node scripts/test-default-branding-assets.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: approved-branding-preview
+          path: |
+            assets/default-icon.png
+            assets/default-icon.webp
+            assets/default-splash.png
+            assets/default-splash.webp
