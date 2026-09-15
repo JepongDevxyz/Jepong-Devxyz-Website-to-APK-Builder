@@ -2,6 +2,8 @@ name: Verify All APK Engines
 
 on:
   push:
+    branches: [main, default-branding-signing-work]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 

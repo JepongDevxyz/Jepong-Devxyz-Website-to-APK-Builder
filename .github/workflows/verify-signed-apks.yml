@@ -5,8 +5,13 @@ on:
   push:
     branches:
       - main
+      - default-branding-signing-work
     paths:
       - '.github/workflows/verify-signed-apks.yml'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read

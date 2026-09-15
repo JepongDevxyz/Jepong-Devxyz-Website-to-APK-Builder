@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix-splash-apksigner-three-engines
+      - default-branding-signing-work
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
