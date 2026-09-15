@@ -7,6 +7,10 @@ on:
       - main
     paths:
       - '.github/workflows/verify-signed-apks.yml'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
@@ -64,6 +68,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install Android SDK
         shell: bash

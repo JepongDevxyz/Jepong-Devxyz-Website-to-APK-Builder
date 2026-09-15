@@ -2,6 +2,8 @@ name: Verify All APK Engines
 
 on:
   push:
+    branches: [main, default-branding-signing-work]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -45,6 +47,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install Android SDK 36
         shell: bash
@@ -191,6 +195,9 @@ jobs:
           awk -v b="$BYTES" 'BEGIN {
             printf "Raw APK size: %.2f MiB\n", b / 1048576
           }'
+
+      - name: Verify final APK branding
+        run: node scripts/verify-apk-branding.mjs "${{ steps.apk.outputs.apk }}" "${{ matrix.engine }}"
 
       - name: Upload verified APK
         uses: actions/upload-artifact@v7
