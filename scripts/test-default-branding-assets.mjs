@@ -13,16 +13,12 @@ const ROOT=path.resolve(process.cwd());
 
 const EXPECTED={
   icon:{
-    sourcePath:path.join(ROOT,'assets/default-icon.png'),
-    sha256:'c133bdd4f325a007b49d0d7387eac531dc61f6c9b5369bd1d1854f1b23491396',
-    width:256,
-    height:256
+    encodedPath:path.join(ROOT,'assets/default-icon.base64.txt'),
+    sha256:'c21203d52d12fce3bca167c2154939373b80b57660c30f4752b711b581e2328b'
   },
   splash:{
     encodedPath:path.join(ROOT,'assets/default-splash.base64.txt'),
-    sha256:'a3543d9521e3e21fc4014ad29544bac49949dd45ae92cb715af6c300bbc6a91d',
-    width:270,
-    height:480
+    sha256:'f28357f1a05e2f0ad9e031ab215c7108b3b42060c1ef54478a5da712f54bce6f'
   }
 };
 
@@ -30,29 +26,21 @@ function sha256(buffer){
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-function pngSize(buffer,label){
-  assert.deepEqual(
-    [...buffer.subarray(0,8)],
-    [137,80,78,71,13,10,26,10],
-    `${label}: default branding asset must be a real PNG`
-  );
-  return { width:buffer.readUInt32BE(16), height:buffer.readUInt32BE(20) };
+function assertWebp(buffer,label){
+  assert.equal(buffer.subarray(0,4).toString('ascii'),'RIFF',`${label}: missing RIFF header`);
+  assert.equal(buffer.subarray(8,12).toString('ascii'),'WEBP',`${label}: default branding asset must be WebP`);
 }
 
-const iconSource=fs.readFileSync(EXPECTED.icon.sourcePath);
-assert.equal(sha256(iconSource),EXPECTED.icon.sha256,'icon: unexpected default asset');
-
-const encodedSplash=fs.readFileSync(EXPECTED.splash.encodedPath,'utf8').trim();
-const splashSource=Buffer.from(encodedSplash,'base64');
-assert.equal(sha256(splashSource),EXPECTED.splash.sha256,'splash: unexpected decoded default payload');
-
 for(const [kind,spec] of Object.entries(EXPECTED)){
+  assert.ok(fs.existsSync(spec.encodedPath),`${kind}: missing encoded default payload`);
+  const source=Buffer.from(fs.readFileSync(spec.encodedPath,'utf8').replace(/\s+/g,''),'base64');
+  assertWebp(source,kind);
+  assert.equal(sha256(source),spec.sha256,`${kind}: unexpected default payload`);
+
   const fallback=brandedAsset({},kind);
-  const size=pngSize(fallback.buffer,kind);
-  assert.equal(fallback.ext,'png',`${kind}: fallback extension must be PNG`);
+  assert.equal(fallback.ext,'webp',`${kind}: fallback extension must be WebP`);
+  assertWebp(fallback.buffer,kind);
   assert.equal(sha256(fallback.buffer),spec.sha256,`${kind}: brandedAsset fallback drifted`);
-  assert.equal(size.width,spec.width,`${kind}: unexpected width`);
-  assert.equal(size.height,spec.height,`${kind}: unexpected height`);
 }
 
 const baseConfig={
@@ -76,7 +64,9 @@ const baseConfig={
 
 function assertFileHash(file,expected,label){
   assert.ok(fs.existsSync(file),`${label}: missing ${file}`);
-  assert.equal(sha256(fs.readFileSync(file)),expected,`${label}: default branding bytes changed`);
+  const buffer=fs.readFileSync(file);
+  assertWebp(buffer,label);
+  assert.equal(sha256(buffer),expected,`${label}: default branding bytes changed`);
 }
 
 for(const engine of ['native','gecko','capacitor','cordova']){
@@ -85,33 +75,33 @@ for(const engine of ['native','gecko','capacitor','cordova']){
 
   if(engine==='native' || engine==='gecko'){
     writeNative(cfg,root,engine==='gecko');
-    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_icon.png'),EXPECTED.icon.sha256,`${engine} icon`);
-    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_splash.png'),EXPECTED.splash.sha256,`${engine} splash`);
+    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_icon.webp'),EXPECTED.icon.sha256,`${engine} icon`);
+    assertFileHash(path.join(root,'app/src/main/res/drawable-nodpi/app_splash.webp'),EXPECTED.splash.sha256,`${engine} splash`);
   }
 
   if(engine==='capacitor'){
     writeCapacitor(cfg,root);
-    assertFileHash(path.join(root,'branding/app_icon.png'),EXPECTED.icon.sha256,'capacitor icon');
-    assertFileHash(path.join(root,'branding/app_splash.png'),EXPECTED.splash.sha256,'capacitor splash');
+    assertFileHash(path.join(root,'branding/app_icon.webp'),EXPECTED.icon.sha256,'capacitor icon');
+    assertFileHash(path.join(root,'branding/app_splash.webp'),EXPECTED.splash.sha256,'capacitor splash');
   }
 
   if(engine==='cordova'){
     writeCordova(cfg,root);
     for(const [file,hash,label] of [
-      ['branding/app_icon.png',EXPECTED.icon.sha256,'cordova branded icon'],
-      ['branding/app_splash.png',EXPECTED.splash.sha256,'cordova branded splash'],
-      ['res/icon.png',EXPECTED.icon.sha256,'cordova bootstrap icon'],
-      ['res/screen/android/splash.png',EXPECTED.splash.sha256,'cordova bootstrap splash']
+      ['branding/app_icon.webp',EXPECTED.icon.sha256,'cordova branded icon'],
+      ['branding/app_splash.webp',EXPECTED.splash.sha256,'cordova branded splash'],
+      ['res/icon.webp',EXPECTED.icon.sha256,'cordova bootstrap icon'],
+      ['res/screen/android/splash.webp',EXPECTED.splash.sha256,'cordova bootstrap splash']
     ]){
       assertFileHash(path.join(root,file),hash,label);
     }
 
     const xml=fs.readFileSync(path.join(root,'config.xml'),'utf8');
-    assert.match(xml,/icon src="res\/icon\.png"/,'cordova config must reference PNG icon');
-    assert.match(xml,/AndroidWindowSplashScreenAnimatedIcon" value="res\/screen\/android\/splash\.png"/,'cordova config must reference PNG splash');
+    assert.match(xml,/icon src="res\/icon\.webp"/,'cordova config must reference WebP icon');
+    assert.match(xml,/AndroidWindowSplashScreenAnimatedIcon" value="res\/screen\/android\/splash\.webp"/,'cordova config must reference WebP splash');
   }
 
   fs.rmSync(root,{recursive:true,force:true});
 }
 
-console.log('✓ Jepong Devxyz requested branding propagates as Android-safe PNGs to all four engines');
+console.log('✓ Jepong Devxyz requested defaults propagate as exact WebP branding to all four engines');
