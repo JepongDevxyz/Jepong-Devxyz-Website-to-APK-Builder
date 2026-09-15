@@ -13,48 +13,63 @@ if(!apk || !engine || !ENGINES.includes(engine)){
 }
 if(!fs.existsSync(apk)){ console.error(`APK not found: ${apk}`); process.exit(2); }
 
-// Final paths produced by write-native/write-capacitor/write-cordova and the
-// shared Android patch. The selected splash is relocated to app assets so
-// AAPT2 never compiles the full branded image.
-const EXPECTED_PATHS={
-  native:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
-  gecko:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
-  capacitor:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']},
-  cordova:{icon:['res/drawable-nodpi-v4/app_icon.png','res/drawable-nodpi/app_icon.png','res/drawable/app_icon.png'],splash:['assets/jepong_splash.img']}
-};
 const expected={
   icon:crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT,'assets/default-icon.png'))).digest('hex'),
   splash:crypto.createHash('sha256').update(Buffer.from(fs.readFileSync(path.join(ROOT,'assets/default-splash.base64.txt'),'utf8').trim(),'base64')).digest('hex')
 };
+
 function zipEntries(){
   const result=spawnSync('unzip',['-Z1',apk],{encoding:'utf8'});
   if(result.status!==0) throw new Error(`unable to read APK archive: ${result.stderr.trim()}`);
   return result.stdout.split(/\r?\n/).filter(Boolean);
 }
 function bytesFor(entry){
-  const result=spawnSync('unzip',['-p',apk,entry],{encoding:null});
+  const result=spawnSync('unzip',['-p',apk,entry],{encoding:null,maxBuffer:32*1024*1024});
   if(result.status!==0) throw new Error(`unable to read APK entry: ${entry}`);
   return result.stdout;
 }
-function findExpected(entries,kind){
-  const allowed=EXPECTED_PATHS[engine][kind];
-  const present=allowed.filter(entry=>entries.includes(entry));
-  const matching=present.filter(entry=>crypto.createHash('sha256').update(bytesFor(entry)).digest('hex')===expected[kind]);
-  return {allowed,present,matching};
+function digestEntry(entry){
+  return crypto.createHash('sha256').update(bytesFor(entry)).digest('hex');
 }
+function unique(items){ return [...new Set(items)]; }
+
 try{
   const entries=zipEntries();
-  const icon=findExpected(entries,'icon');
-  const splash=findExpected(entries,'splash');
-  const report={status:icon.matching.length===1&&splash.matching.length===1?'verified':'failed',apk:path.resolve(apk),engine,
-    icon:{expectedSha256:expected.icon,allowedEntries:icon.allowed,presentEntries:icon.present,matchingEntries:icon.matching},
-    splash:{expectedSha256:expected.splash,allowedEntries:splash.allowed,presentEntries:splash.present,matchingEntries:splash.matching},
-    diagnosticEntries:entries.filter(entry=>/(icon|launcher|drawable|mipmap)/i.test(entry)).slice(0,300)};
+
+  // Android/AAPT2 may rewrite resource qualifier directories in the packaged
+  // APK (for example drawable-nodpi -> drawable-nodpi-v4). Verify the actual
+  // selected branding bytes instead of requiring one source-tree pathname.
+  const iconCandidates=entries.filter(entry=>
+    /^res\/drawable(?:-[^/]+)?\/app_icon\.(?:png|webp|jpe?g)$/i.test(entry) ||
+    /^res\/mipmap(?:-[^/]+)?\/app_icon\.(?:png|webp|jpe?g)$/i.test(entry)
+  );
+  const splashCandidates=entries.filter(entry=>entry==='assets/jepong_splash.img');
+
+  const iconMatching=iconCandidates.filter(entry=>digestEntry(entry)===expected.icon);
+  const splashMatching=splashCandidates.filter(entry=>digestEntry(entry)===expected.splash);
+
+  const report={
+    status:iconMatching.length>=1&&splashMatching.length===1?'verified':'failed',
+    apk:path.resolve(apk),
+    engine,
+    icon:{expectedSha256:expected.icon,presentEntries:unique(iconCandidates),matchingEntries:unique(iconMatching)},
+    splash:{expectedSha256:expected.splash,presentEntries:unique(splashCandidates),matchingEntries:unique(splashMatching)},
+    diagnosticEntries:entries.filter(entry=>/(app_icon|jepong_splash|launcher|drawable|mipmap)/i.test(entry)).slice(0,300)
+  };
+
   if(report.status!=='verified'){
     const failures=[];
-    if(icon.present.length!==1) failures.push('icon path'); else if(icon.matching.length!==1) failures.push('icon bytes');
-    if(splash.present.length!==1) failures.push('splash path'); else if(splash.matching.length!==1) failures.push('splash bytes');
+    if(iconCandidates.length===0) failures.push('icon path');
+    else if(iconMatching.length===0) failures.push('icon bytes');
+    if(splashCandidates.length!==1) failures.push('splash path');
+    else if(splashMatching.length!==1) failures.push('splash bytes');
     console.error(`APK branding mismatch (${engine}): ${failures.join(', ')}`);
-    process.stdout.write(`${JSON.stringify(report)}\n`); process.exitCode=1;
-  }else process.stdout.write(`${JSON.stringify(report)}\n`);
-}catch(error){ console.error(error instanceof Error?error.message:String(error)); process.exitCode=1; }
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    process.exitCode=1;
+  }else{
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+  }
+}catch(error){
+  console.error(error instanceof Error?error.message:String(error));
+  process.exitCode=1;
+}
