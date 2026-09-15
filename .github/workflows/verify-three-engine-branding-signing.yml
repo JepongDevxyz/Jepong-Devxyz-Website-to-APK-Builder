@@ -5,6 +5,7 @@ on:
     branches: [fix-splash-apksigner-three-engines]
     paths:
       - '.github/workflows/verify-three-engine-branding-signing.yml'
+      - '.github/workflows/build-apk.yml'
       - 'assets/default-icon.png'
       - 'assets/default-splash.png'
       - 'scripts/**'
