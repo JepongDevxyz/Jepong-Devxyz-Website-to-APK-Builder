@@ -196,6 +196,9 @@ jobs:
             printf "Raw APK size: %.2f MiB\n", b / 1048576
           }'
 
+      - name: Verify final APK branding
+        run: node scripts/verify-apk-branding.mjs "${{ steps.apk.outputs.apk }}" "${{ matrix.engine }}"
+
       - name: Upload verified APK
         uses: actions/upload-artifact@v7
         with:
