@@ -47,6 +47,8 @@ jobs:
           java-version: '17'
 
       - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
 
       - name: Install Android SDK
         shell: bash
