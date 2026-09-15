@@ -23,9 +23,8 @@ export function normalizePngForAndroid(buffer){if(!Buffer.isBuffer(buffer)||buff
 export function brandedAsset(cfg,kind){
   const uploaded=dataUrlToAsset(kind==='icon'?cfg.iconDataUrl:cfg.splashDataUrl);
   if(uploaded){if(uploaded.ext==='png')return {...uploaded,buffer:normalizePngForAndroid(uploaded.buffer)};return uploaded;}
-  // Approved Jepong Devxyz defaults: optimized WebP keeps generated APKs small.
-  const webp=path.join(ROOT,'assets',kind==='icon'?'default-icon.webp':'default-splash.webp');
-  if(fs.existsSync(webp))return {ext:'webp',buffer:fs.readFileSync(webp)};
+  // Approved Jepong Devxyz defaults. Keep Android resources as normalized true-color PNGs
+  // so Native, Capacitor and Cordova all receive the same launcher/splash format.
   const png=path.join(ROOT,'assets',kind==='icon'?'default-icon.png':'default-splash.png');
   if(!fs.existsSync(png))throw new Error(`Missing default ${kind} asset`);
   return {ext:'png',buffer:normalizePngForAndroid(fs.readFileSync(png))};
