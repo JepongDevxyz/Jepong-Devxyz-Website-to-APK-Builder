@@ -14,15 +14,15 @@ const ROOT=path.resolve(process.cwd());
 const EXPECTED={
   icon:{
     sourcePath:path.join(ROOT,'assets/default-icon.png'),
-    sha256:'e5349aeec51bc14f405ae4a72b1aa94cc67c3c1c71e4843d838022851170bc55',
-    width:1536,
-    height:1536
+    sha256:'3288e29650dfbcaa87c87b96f7116b76597c1457f31e8cefcf9cb0d35076066c',
+    width:512,
+    height:512
   },
   splash:{
     encodedPath:path.join(ROOT,'assets/default-splash.base64.txt'),
-    sha256:'0864821dc991fa6b42d99f22e70751de7740c28623c81f2b1fea682dec308411',
-    width:864,
-    height:1536
+    sha256:'4ccb35d3e515108fef6df63c925aa2ee492b03ce1a43e047597341bc6e70322b',
+    width:432,
+    height:768
   }
 };
 
@@ -114,4 +114,4 @@ for(const engine of ['native','gecko','capacitor','cordova']){
   fs.rmSync(root,{recursive:true,force:true});
 }
 
-console.log('✓ Jepong Devxyz default branding propagates exact requested PNGs to all four engines');
+console.log('✓ Jepong Devxyz default branding propagates the requested optimized PNGs to all four engines');
