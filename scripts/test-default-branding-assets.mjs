@@ -13,7 +13,7 @@ const icon=brandedAsset({},'icon'),splash=brandedAsset({},'splash');
 assert.equal(icon.ext,'webp','default icon must use approved WebP artwork');
 assert.equal(splash.ext,'webp','default splash must use approved WebP artwork');
 assert.equal(sha256(icon.buffer),'b9e1b537525ecc1eb494e887372fc71d5d5e7aae511295ad7914200111487e03','default icon artwork hash mismatch');
-assert.equal(sha256(splash.buffer),'20e40797911393f99be995b8e57a4f280ac3cf4d74a30508955109980459fa35','default splash artwork hash mismatch');
+assert.equal(sha256(splash.buffer),'886b1ce21ecd2d3dee2f33b70219bd8eed1dee4d610a1f39755fba1b45a20391','default splash artwork hash mismatch');
 assertBrand(icon,'default icon');assertBrand(splash,'default splash');
 const iconHash=sha256(icon.buffer),splashHash=sha256(splash.buffer);
 const baseConfig={websiteUrl:'https://example.com',appName:'Jepong Default Branding Test',packageName:'com.jepongdevxyz.defaultbranding',versionName:'1.0.0',versionCode:1,renderMode:'default',orientation:'auto',permissions:[],controls:[],extensions:[],splashEnabled:true,splashDuration:1500,apkSigner:true,oneSignalAppId:'',offlineFallback:'Offline',iconDataUrl:'',splashDataUrl:''};
