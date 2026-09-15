@@ -132,35 +132,7 @@ jobs:
           gradle-version: '8.14.2'
 
       - name: Verify final Android branding injection
-        shell: bash
-        run: |
-          set -euo pipefail
-          case "$ENGINE" in
-            native) APP_ROOT="work/$BUILD_ID/project/app" ;;
-            capacitor) APP_ROOT="work/$BUILD_ID/project/android/app" ;;
-            cordova) APP_ROOT="work/$BUILD_ID/project/platforms/android/app" ;;
-          esac
-
-          ICON="$APP_ROOT/src/main/res/drawable-nodpi/app_icon.png"
-          SPLASH="$APP_ROOT/src/main/res/drawable-nodpi/app_splash.png"
-          MANIFEST="$APP_ROOT/src/main/AndroidManifest.xml"
-          JAVA="$APP_ROOT/src/main/java/com/jepongdevxyz/branding${ENGINE}/JepongSplashActivity.java"
-
-          test -s "$ICON"
-          test -s "$SPLASH"
-          test -s "$MANIFEST"
-          test -s "$JAVA"
-
-          test "$(sha256sum assets/default-icon.png | awk '{print $1}')" = "$(sha256sum "$ICON" | awk '{print $1}')"
-          test "$(sha256sum assets/default-splash.png | awk '{print $1}')" = "$(sha256sum "$SPLASH" | awk '{print $1}')"
-
-          grep -q 'android:name=".JepongSplashActivity"' "$MANIFEST"
-          grep -q 'android.intent.action.MAIN' "$MANIFEST"
-          grep -q 'android.intent.category.LAUNCHER' "$MANIFEST"
-          grep -q 'R.drawable.app_splash' "$JAVA"
-          grep -q 'ImageView.ScaleType.CENTER_CROP' "$JAVA"
-
-          echo "✅ $ENGINE final Android project contains exact default icon + splash and launcher"
+        run: node scripts/verify-final-android-branding.mjs --build-id "$BUILD_ID" --engine "$ENGINE"
 
       - name: Build Native release
         if: matrix.engine == 'native'
