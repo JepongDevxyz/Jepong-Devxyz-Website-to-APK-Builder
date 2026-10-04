@@ -1,164 +1,134 @@
-/* Shared Java snippets for fullscreen mode (all 4 engines).
-   Fullscreen mode = bottom navigation toolbar hidden, navigation buttons
-   attached side-by-side to the screen edge (floating, collapsible), and
-   working video fullscreen playback.
-   The show/hide mechanics are engine-agnostic; each engine wires its own
-   fullscreen trigger (WebView onShowCustomView / Gecko onFullScreen) to
-   jepongShowFullscreenVideo / jepongHideFullscreenVideo. */
+/* Shared Fullscreen Mode helpers (all four engines).
+   New behavior (per user request):
+   - NO side panel. The bottom toolbar auto-hides after 3s idle and reappears on tap.
+   - Status bar uses Android IMMERSIVE_STICKY (system auto-hides/shows on edge swipe).
+   - Video fullscreen: absolutely NO UI (no toolbar, no handle) — true fullscreen.
+   - Tap anywhere (dispatchTouchEvent) → show toolbar; 3s idle → hide.
+   Uses anonymous inner classes only (no lambdas) for maximum build compatibility. */
 
 export const FULLSCREEN_JAVA_FIELDS = `
-  View jepongSidePanel;
-  boolean jepongSideExpanded=true;
+  View jepongToolbarView;
+  android.os.Handler jepongUiHandler;
+  Runnable jepongUiHideRunnable;
   View jepongFullscreenView;
   android.webkit.WebChromeClient.CustomViewCallback jepongFullscreenCallback;
-  android.os.Handler jepongUiHandler;
-  Runnable jepongAutoHideRunnable;
+  boolean jepongVideoFullscreen=false;
 `;
 
 export function fullscreenJavaMethods() {
   return `
-  int jepongDp(int v){ return (int)(v*getResources().getDisplayMetrics().density+0.5f); }
-  Button jepongSideBtn(String label){
-    Button b=new Button(this);
-    b.setText(label);
-    b.setTextSize(11f);
-    b.setAllCaps(false);
-    b.setSingleLine(true);
-    int hp=jepongDp(8), vp=jepongDp(4);
-    b.setPadding(hp,vp,hp,vp);
-    return b;
+  void jepongSetupImmersive(){
+    try{
+      getWindow().getDecorView().setSystemUiVisibility(
+        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        | View.SYSTEM_UI_FLAG_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }catch(Exception ignored){}
   }
-  void jepongBuildSidePanel(Runnable onBack,Runnable onForward,Runnable onHome,Runnable onReload,Runnable onShare){
-    LinearLayout panel=new LinearLayout(this);
-    panel.setOrientation(LinearLayout.HORIZONTAL);
-    panel.setGravity(Gravity.CENTER_VERTICAL);
-    panel.setBackgroundColor(Color.argb(170,17,24,39));
-    int pad=jepongDp(4);
-    panel.setPadding(pad,pad,pad,pad);
-    Button handle=jepongSideBtn("»");
-    handle.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongToggleSidePanel(); } });
-    panel.addView(handle);
-    Button bBack=jepongSideBtn("‹");
-    bBack.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onBack.run(); } });
-    Button bFwd=jepongSideBtn("›");
-    bFwd.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onForward.run(); } });
-    Button bHome=jepongSideBtn("Home");
-    bHome.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onHome.run(); } });
-    Button bReload=jepongSideBtn("Reload");
-    bReload.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onReload.run(); } });
-    Button bShare=jepongSideBtn("Share");
-    bShare.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onShare.run(); } });
-    panel.addView(bBack);
-    panel.addView(bFwd);
-    panel.addView(bHome);
-    panel.addView(bReload);
-    panel.addView(bShare);
-    FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
-      FrameLayout.LayoutParams.WRAP_CONTENT,
-      FrameLayout.LayoutParams.WRAP_CONTENT,
-      Gravity.START|Gravity.CENTER_VERTICAL);
-    addContentView(panel,lp);
-    jepongSidePanel=panel;
+  void jepongSetupToolbarAutoHide(View toolbar){
+    jepongToolbarView=toolbar;
     jepongUiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    jepongAutoHideRunnable=new Runnable(){ public void run(){
-      if(jepongSidePanel!=null&&jepongSideExpanded&&jepongFullscreenView==null){
-        jepongToggleSidePanel();
+    jepongUiHideRunnable=new Runnable(){ public void run(){
+      if(!jepongVideoFullscreen&&jepongToolbarView!=null){
+        jepongToolbarView.setVisibility(View.GONE);
       }
     } };
-    jepongScheduleAutoHide();
+    if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.GONE);
+    jepongSetupImmersive();
   }
-  void jepongScheduleAutoHide(){
-    if(jepongUiHandler==null||jepongAutoHideRunnable==null) return;
-    jepongUiHandler.removeCallbacks(jepongAutoHideRunnable);
-    jepongUiHandler.postDelayed(jepongAutoHideRunnable,3000);
-  }
-  void jepongToggleSidePanel(){
-    if(jepongSidePanel==null) return;
-    jepongSideExpanded=!jepongSideExpanded;
-    ViewGroup g=(ViewGroup)jepongSidePanel;
-    for(int i=1;i<g.getChildCount();i++){
-      g.getChildAt(i).setVisibility(jepongSideExpanded?View.VISIBLE:View.GONE);
+  void jepongShowToolbar(){
+    if(jepongVideoFullscreen) return;
+    if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.VISIBLE);
+    if(jepongUiHandler!=null&&jepongUiHideRunnable!=null){
+      jepongUiHandler.removeCallbacks(jepongUiHideRunnable);
+      jepongUiHandler.postDelayed(jepongUiHideRunnable,3000);
     }
-    if(jepongSideExpanded) jepongScheduleAutoHide();
-    else if(jepongUiHandler!=null&&jepongAutoHideRunnable!=null) jepongUiHandler.removeCallbacks(jepongAutoHideRunnable);
   }
   void jepongShowFullscreenVideo(View view,android.webkit.WebChromeClient.CustomViewCallback callback){
-    if(jepongFullscreenView!=null){ try{callback.onCustomViewHidden();}catch(Exception ignored){} return; }
-    jepongFullscreenView=view;
-    jepongFullscreenCallback=callback;
+    if(view==null) return;
+    jepongVideoFullscreen=true;
+    if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.GONE);
+    if(jepongUiHandler!=null&&jepongUiHideRunnable!=null){
+      jepongUiHandler.removeCallbacks(jepongUiHideRunnable);
+    }
     try{
-      getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-      FrameLayout decor=(FrameLayout)getWindow().getDecorView();
-      decor.addView(view,new FrameLayout.LayoutParams(
-        FrameLayout.LayoutParams.MATCH_PARENT,
-        FrameLayout.LayoutParams.MATCH_PARENT));
+      getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      getWindow().getDecorView().setSystemUiVisibility(
+        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        | View.SYSTEM_UI_FLAG_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }catch(Exception ignored){}
-    if(jepongSidePanel!=null) jepongSidePanel.setVisibility(View.GONE);
+    try{
+      android.view.ViewGroup decor=(android.view.ViewGroup)getWindow().getDecorView();
+      android.widget.FrameLayout.LayoutParams lp=new android.widget.FrameLayout.LayoutParams(
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+      decor.addView(view,lp);
+      jepongFullscreenView=view;
+      jepongFullscreenCallback=callback;
+    }catch(Exception ignored){}
   }
   void jepongHideFullscreenVideo(){
-    if(jepongFullscreenView==null) return;
+    jepongVideoFullscreen=false;
     try{
-      FrameLayout decor=(FrameLayout)getWindow().getDecorView();
-      decor.removeView(jepongFullscreenView);
+      if(jepongFullscreenView!=null){
+        android.view.ViewGroup parent=(android.view.ViewGroup)jepongFullscreenView.getParent();
+        if(parent!=null) parent.removeView(jepongFullscreenView);
+      }
     }catch(Exception ignored){}
     jepongFullscreenView=null;
-    if(jepongFullscreenCallback!=null){
-      try{jepongFullscreenCallback.onCustomViewHidden();}catch(Exception ignored){}
-      jepongFullscreenCallback=null;
-    }
-    try{ getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
-    if(jepongSidePanel!=null&&jepongSideExpanded) jepongSidePanel.setVisibility(View.VISIBLE);
+    try{
+      if(jepongFullscreenCallback!=null) jepongFullscreenCallback.onCustomViewHidden();
+    }catch(Exception ignored){}
+    jepongFullscreenCallback=null;
+    try{
+      getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    }catch(Exception ignored){}
+    jepongSetupImmersive();
   }
-  boolean jepongIsFullscreenVideo(){ return jepongFullscreenView!=null; }
+  boolean jepongIsFullscreenVideo(){
+    return jepongVideoFullscreen&&jepongFullscreenView!=null;
+  }
 `;
 }
 
-/* Delegating WebChromeClient for engines whose WebView already has a client
-   (Capacitor/Cordova). Forwards everything to the existing client and only
-   intercepts fullscreen video. Safe when base is null (behaves like default). */
+export function fullscreenDispatchTouchEvent() {
+  return `
+  @Override public boolean dispatchTouchEvent(android.view.MotionEvent ev){
+    try{
+      if(ev!=null&&ev.getAction()==android.view.MotionEvent.ACTION_DOWN){
+        jepongShowToolbar();
+      }
+    }catch(Exception ignored){}
+    return super.dispatchTouchEvent(ev);
+  }
+`;
+}
+
 export function fullscreenChromeClientDelegate() {
   return `
   void jepongAttachFullscreenVideoSupport(android.webkit.WebView w){
     if(w==null) return;
-    final android.webkit.WebChromeClient base=w.getWebChromeClient();
-    w.setWebChromeClient(new android.webkit.WebChromeClient(){
-      @Override public void onShowCustomView(View view,CustomViewCallback callback){
-        jepongShowFullscreenVideo(view,callback);
-      }
-      @Override public void onHideCustomView(){
-        jepongHideFullscreenVideo();
-      }
-      @Override public boolean onShowFileChooser(android.webkit.WebView v,android.webkit.ValueCallback<android.net.Uri[]> cb,FileChooserParams p){
-        if(base!=null) return base.onShowFileChooser(v,cb,p);
-        return super.onShowFileChooser(v,cb,p);
-      }
-      @Override public void onPermissionRequest(android.webkit.PermissionRequest req){
-        if(base!=null){ base.onPermissionRequest(req); return; }
-        super.onPermissionRequest(req);
-      }
-      @Override public void onGeolocationPermissionsShowPrompt(String origin,android.webkit.GeolocationPermissions.Callback cb){
-        if(base!=null){ base.onGeolocationPermissionsShowPrompt(origin,cb); return; }
-        super.onGeolocationPermissionsShowPrompt(origin,cb);
-      }
-      @Override public void onProgressChanged(android.webkit.WebView v,int p){
-        if(base!=null) base.onProgressChanged(v,p); else super.onProgressChanged(v,p);
-      }
-      @Override public void onReceivedTitle(android.webkit.WebView v,String t){
-        if(base!=null) base.onReceivedTitle(v,t); else super.onReceivedTitle(v,t);
-      }
-      @Override public boolean onJsAlert(android.webkit.WebView v,String url,String msg,android.webkit.JsResult r){
-        if(base!=null) return base.onJsAlert(v,url,msg,r);
-        return super.onJsAlert(v,url,msg,r);
-      }
-      @Override public boolean onJsConfirm(android.webkit.WebView v,String url,String msg,android.webkit.JsResult r){
-        if(base!=null) return base.onJsConfirm(v,url,msg,r);
-        return super.onJsConfirm(v,url,msg,r);
-      }
-      @Override public boolean onJsPrompt(android.webkit.WebView v,String url,String msg,String def,android.webkit.JsPromptResult r){
-        if(base!=null) return base.onJsPrompt(v,url,msg,def,r);
-        return super.onJsPrompt(v,url,msg,def,r);
-      }
-    });
+    try{
+      final android.webkit.WebChromeClient base=(android.webkit.WebChromeClient)w.getWebChromeClient();
+      w.setWebChromeClient(new android.webkit.WebChromeClient(){
+        @Override public void onShowCustomView(View view,CustomViewCallback callback){
+          jepongShowFullscreenVideo(view,callback);
+        }
+        @Override public void onHideCustomView(){
+          jepongHideFullscreenVideo();
+        }
+        @Override public boolean onCreateWindow(android.webkit.WebView v,boolean d,boolean u,android.os.Message m){ return base!=null&&base.onCreateWindow(v,d,u,m); }
+        @Override public void onProgressChanged(android.webkit.WebView v,int p){ if(base!=null) base.onProgressChanged(v,p); }
+        @Override public void onReceivedTitle(android.webkit.WebView v,String t){ if(base!=null) base.onReceivedTitle(v,t); }
+      });
+    }catch(Exception ignored){}
   }
 `;
 }
