@@ -454,6 +454,9 @@ function collect(){
         ? $('#abiTarget').value
         : 'universal',
 
+    tvOptimized:
+      $('#tvOptimized').checked,
+
     oneSignalAppId:val('#oneSignalAppId'),
     offlineFallback:val('#offlineFallback'),
 
@@ -562,6 +565,7 @@ function updateSummary(){
   '#apkSigner',
   '#sizeOptimization',
   '#abiTarget',
+  '#tvOptimized',
   '#oneSignalAppId',
   '#offlineFallback'
 ].forEach(selector=>{
@@ -831,6 +835,9 @@ function applyConfig(config){
     ['arm64-v8a','universal'].includes(config.abiTarget)
       ? config.abiTarget
       : 'arm64-v8a';
+
+  $('#tvOptimized').checked=
+    config.tvOptimized===true;
 
   updateSizeOptimizationUI();
 
@@ -1418,6 +1425,8 @@ $('#resetBtn').onclick=()=>{
 
     sizeOptimization:true,
     abiTarget:'arm64-v8a',
+
+    tvOptimized:false,
 
     oneSignalAppId:'',
 
