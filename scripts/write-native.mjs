@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { write, mkdir, escXml, javaString, brandedAsset } from './common.mjs';
-import { FULLSCREEN_JAVA_FIELDS, fullscreenJavaMethods, fullscreenDispatchTouchEvent } from './fullscreen-mode.mjs';
+// Fullscreen mode removed per user request
 
 const perms = {
   camera: ['android.permission.CAMERA'],
@@ -253,7 +253,7 @@ function webViewActivity(cfg) {
   const downloadManager=controls.includes('downloadManager');
   // Fullscreen mode: bottom toolbar hidden, nav buttons float on the side
   // edge (auto-hide), and video fullscreen playback works.
-  const fullscreenMode=cfg.fullscreenMode===true;
+  const fullscreenMode=false; // Fullscreen mode removed per user request
   const showBottomBar=navigationToolbar;
   // Fullscreen mode: toolbar built but auto-hides (no side panel)
   const cameraAllowed=(cfg.permissions||[]).includes('camera');
@@ -349,7 +349,7 @@ function geckoActivity(cfg) {
       'navigationToolbar'
     );
 
-  const fullscreenMode=cfg.fullscreenMode===true;
+  const fullscreenMode=false; // Fullscreen mode removed per user request
 
   const externalLinks=
     geckoControls.includes(
