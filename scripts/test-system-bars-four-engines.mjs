@@ -24,6 +24,14 @@ public class MainActivity extends android.app.Activity {
     if(android.os.Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT); getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);}
   }
 }`);
+    // Theme fixture: light template default with white window background
+    // (what Capacitor/Cordova templates ship).
+    const valuesDir=path.join(appRoot,'src/main/res/values');
+    fs.mkdirSync(valuesDir,{recursive:true});
+    const stylesFile=path.join(valuesDir,'styles.xml');
+    fs.writeFileSync(stylesFile,
+      '<resources><style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">' +
+      '<item name="android:windowBackground">#FFFFFF</item></style></resources>');
 
     patchSystemBars({engine,packageName},project);
     const result=fs.readFileSync(javaFile,'utf8');
@@ -41,8 +49,18 @@ public class MainActivity extends android.app.Activity {
     if(!result.includes('setNavigationBarColor(android.graphics.Color.TRANSPARENT)')){
       throw new Error(`${engine} transparent navigation option was not preserved`);
     }
+    // Window background must be forced dark in the theme (no white).
+    const stylesResult=fs.readFileSync(
+      path.join(appRoot,'src/main/res/values/styles.xml'),'utf8');
+    if(!stylesResult.includes('<item name="android:windowBackground">#111827</item>')){
+      throw new Error(`${engine} windowBackground was not forced dark`);
+    }
+    if(/#FFFFFF/i.test(stylesResult)){
+      throw new Error(`${engine} white windowBackground survived the patch`);
+    }
   }
   console.log('✓ Dark portrait/landscape status-bar contract verified for Native, Gecko, Capacitor, Cordova');
+  console.log('✓ Dark windowBackground contract verified for Native, Gecko, Capacitor, Cordova');
 } finally {
   fs.rmSync(temp,{recursive:true,force:true});
 }

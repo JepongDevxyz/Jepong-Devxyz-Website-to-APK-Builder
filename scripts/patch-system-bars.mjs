@@ -49,7 +49,36 @@ const helper=`
 
 `;
 
+/* Force a dark window background in the app theme so no white shows
+   behind web content (Capacitor/Cordova templates and any theme that
+   leaves windowBackground at the light default). */
+function patchWindowBackground(cfg, projectDir){
+  const root=appRoot(cfg,projectDir);
+  const candidates=[
+    path.join(root,'src/main/res/values/styles.xml'),
+    path.join(root,'src/main/res/values/themes.xml'),
+  ];
+  for(const file of candidates){
+    if(!fs.existsSync(file)) continue;
+    let s=fs.readFileSync(file,'utf8');
+    if(s.includes('android:windowBackground')){
+      s=s.replace(
+        /<item name="android:windowBackground">[^<]*<\/item>/g,
+        '<item name="android:windowBackground">#111827</item>'
+      );
+    } else {
+      const m=s.match(/<style[^>]*>/);
+      if(!m) continue;
+      s=s.slice(0,m.index+m[0].length) +
+        '<item name="android:windowBackground">#111827</item>' +
+        s.slice(m.index+m[0].length);
+    }
+    fs.writeFileSync(file,s);
+  }
+}
+
 export function patchSystemBars(cfg, projectDir){
+  patchWindowBackground(cfg, projectDir);
   const file=activityPath(cfg,projectDir);
   if(!fs.existsSync(file)){
     throw new Error(`${cfg.engine} MainActivity missing for system-bar patch: ${file}`);
