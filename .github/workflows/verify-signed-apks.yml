@@ -51,7 +51,7 @@ jobs:
       - name: Setup Java 21 for Capacitor
         if: matrix.engine == 'capacitor'
 
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
 
         with:
           distribution: temurin
@@ -60,7 +60,7 @@ jobs:
       - name: Setup Java 17
         if: matrix.engine != 'capacitor'
 
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
 
         with:
           distribution: temurin
