@@ -35,12 +35,12 @@ export function fullscreenJavaMethods() {
     panel.setBackgroundColor(Color.argb(170,17,24,39));
     int pad=jepongDp(4);
     panel.setPadding(pad,pad,pad,pad);
-    Button handle=jepongSideBtn("\\u00BB");
+    Button handle=jepongSideBtn("»");
     handle.setOnClickListener(v->jepongToggleSidePanel());
     panel.addView(handle);
-    Button bBack=jepongSideBtn("\\u2039");
+    Button bBack=jepongSideBtn("‹");
     bBack.setOnClickListener(v->{ jepongScheduleAutoHide(); onBack.run(); });
-    Button bFwd=jepongSideBtn("\\u203A");
+    Button bFwd=jepongSideBtn("›");
     bFwd.setOnClickListener(v->{ jepongScheduleAutoHide(); onForward.run(); });
     Button bHome=jepongSideBtn("Home");
     bHome.setOnClickListener(v->{ jepongScheduleAutoHide(); onHome.run(); });
