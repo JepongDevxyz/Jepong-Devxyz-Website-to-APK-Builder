@@ -241,9 +241,41 @@ public class MainActivity extends BridgeActivity {
   final boolean CAPACITOR_EXTERNAL_LINKS_ENABLED=${externalLinks};
   final boolean CAPACITOR_DOWNLOAD_MANAGER_ENABLED=${downloadManager};
 
-  WebView jepongWebView;${fullscreenMode?FULLSCREEN_JAVA_FIELDS:""}
+  WebView jepongWebView;
+  View jepongVideoView;
+  android.webkit.WebChromeClient.CustomViewCallback jepongVideoCallback;
   Button backButton;
   Button forwardButton;
+
+  void jepongEnterVideoFullscreen(View view, android.webkit.WebChromeClient.CustomViewCallback callback){
+    if(view==null) return;
+    try{
+      getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      android.view.ViewGroup decor=(android.view.ViewGroup)getWindow().getDecorView();
+      android.widget.FrameLayout.LayoutParams lp=new android.widget.FrameLayout.LayoutParams(
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+      decor.addView(view,lp);
+      jepongVideoView=view;
+      jepongVideoCallback=callback;
+    }catch(Exception ignored){}
+  }
+  void jepongExitVideoFullscreen(){
+    try{
+      if(jepongVideoView!=null){
+        android.view.ViewGroup parent=(android.view.ViewGroup)jepongVideoView.getParent();
+        if(parent!=null) parent.removeView(jepongVideoView);
+      }
+    }catch(Exception ignored){}
+    jepongVideoView=null;
+    try{ if(jepongVideoCallback!=null) jepongVideoCallback.onCustomViewHidden(); }catch(Exception ignored){}
+    jepongVideoCallback=null;
+    try{ getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
+  }
+  @Override public void onBackPressed(){
+    if(jepongVideoView!=null){ jepongExitVideoFullscreen(); return; }
+    super.onBackPressed();
+  }
 
   @Override
   protected void onCreate(
@@ -252,6 +284,7 @@ public class MainActivity extends BridgeActivity {
     super.onCreate(
       savedInstanceState
     );
+    try{ getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS); }catch(Exception ignored){}
 
     ${common}
 
@@ -301,9 +334,18 @@ public class MainActivity extends BridgeActivity {
           w
         );
       }
-      ${fullscreenMode?`
-      jepongAttachFullscreenVideoSupport(w);
-      `:""}
+      // Video fullscreen support (always enabled)
+      try{
+        final android.webkit.WebChromeClient capBase=(android.webkit.WebChromeClient)w.getWebChromeClient();
+        w.setWebChromeClient(new android.webkit.WebChromeClient(){
+          @Override public void onShowCustomView(View view,CustomViewCallback callback){ jepongEnterVideoFullscreen(view,callback); }
+          @Override public void onHideCustomView(){ jepongExitVideoFullscreen(); }
+          @Override public boolean onCreateWindow(android.webkit.WebView v,boolean d,boolean u,android.os.Message m){ return capBase!=null&&capBase.onCreateWindow(v,d,u,m); }
+          @Override public void onProgressChanged(android.webkit.WebView v,int p){ if(capBase!=null) capBase.onProgressChanged(v,p); }
+          @Override public void onReceivedTitle(android.webkit.WebView v,String t){ if(capBase!=null) capBase.onReceivedTitle(v,t); }
+        });
+      }catch(Exception ignored){}
+
     }
 
     ${overlay}
@@ -928,10 +970,42 @@ public class MainActivity extends CordovaActivity {
   final boolean CORDOVA_EXTERNAL_LINKS_ENABLED=${externalLinks};
   final boolean CORDOVA_DOWNLOAD_MANAGER_ENABLED=${downloadManager};
 
-  SystemWebView jepongWebView;${fullscreenMode?FULLSCREEN_JAVA_FIELDS:""}
+  SystemWebView jepongWebView;
+  View jepongVideoView;
+  android.webkit.WebChromeClient.CustomViewCallback jepongVideoCallback;
 
   Button backButton;
   Button forwardButton;
+
+  void jepongEnterVideoFullscreen(View view, android.webkit.WebChromeClient.CustomViewCallback callback){
+    if(view==null) return;
+    try{
+      getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      android.view.ViewGroup decor=(android.view.ViewGroup)getWindow().getDecorView();
+      android.widget.FrameLayout.LayoutParams lp=new android.widget.FrameLayout.LayoutParams(
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+        android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+      decor.addView(view,lp);
+      jepongVideoView=view;
+      jepongVideoCallback=callback;
+    }catch(Exception ignored){}
+  }
+  void jepongExitVideoFullscreen(){
+    try{
+      if(jepongVideoView!=null){
+        android.view.ViewGroup parent=(android.view.ViewGroup)jepongVideoView.getParent();
+        if(parent!=null) parent.removeView(jepongVideoView);
+      }
+    }catch(Exception ignored){}
+    jepongVideoView=null;
+    try{ if(jepongVideoCallback!=null) jepongVideoCallback.onCustomViewHidden(); }catch(Exception ignored){}
+    jepongVideoCallback=null;
+    try{ getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
+  }
+  @Override public void onBackPressed(){
+    if(jepongVideoView!=null){ jepongExitVideoFullscreen(); return; }
+    super.onBackPressed();
+  }
 
   @Override
   public void onCreate(
@@ -1002,9 +1076,18 @@ public class MainActivity extends CordovaActivity {
           w
         );
       }
-      ${fullscreenMode?`
-      jepongAttachFullscreenVideoSupport(w);
-      `:""}
+      // Video fullscreen support (always enabled)
+      try{
+        final android.webkit.WebChromeClient capBase=(android.webkit.WebChromeClient)w.getWebChromeClient();
+        w.setWebChromeClient(new android.webkit.WebChromeClient(){
+          @Override public void onShowCustomView(View view,CustomViewCallback callback){ jepongEnterVideoFullscreen(view,callback); }
+          @Override public void onHideCustomView(){ jepongExitVideoFullscreen(); }
+          @Override public boolean onCreateWindow(android.webkit.WebView v,boolean d,boolean u,android.os.Message m){ return capBase!=null&&capBase.onCreateWindow(v,d,u,m); }
+          @Override public void onProgressChanged(android.webkit.WebView v,int p){ if(capBase!=null) capBase.onProgressChanged(v,p); }
+          @Override public void onReceivedTitle(android.webkit.WebView v,String t){ if(capBase!=null) capBase.onReceivedTitle(v,t); }
+        });
+      }catch(Exception ignored){}
+
     }
 
     ${overlay}
