@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadConfig, workDir, brandedAsset, mkdir, write, javaString } from './common.mjs';
 import { patchAndroidVersionMetadata } from './android-version-metadata.mjs';
 import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
-import { FULLSCREEN_JAVA_FIELDS, fullscreenJavaMethods, fullscreenChromeClientDelegate } from './fullscreen-mode.mjs';
+import { FULLSCREEN_JAVA_FIELDS, fullscreenJavaMethods, fullscreenChromeClientDelegate, fullscreenDispatchTouchEvent } from './fullscreen-mode.mjs';
 
 const args=process.argv.slice(2);
 const value=k=>{const i=args.indexOf(k); return i>=0?args[i+1]:''};
@@ -302,12 +302,6 @@ public class MainActivity extends BridgeActivity {
         );
       }
       ${fullscreenMode?`
-      jepongBuildSidePanel(
-        new Runnable(){ public void run(){ if(w!=null&&w.canGoBack()) w.goBack(); } },
-        new Runnable(){ public void run(){ if(w!=null&&w.canGoForward()) w.goForward(); } },
-        new Runnable(){ public void run(){ if(w!=null) w.loadUrl(HOME); } },
-        new Runnable(){ public void run(){ if(w!=null) w.reload(); } },
-        new Runnable(){ public void run(){ shareCapacitorUrl(); } });
       jepongAttachFullscreenVideoSupport(w);
       `:""}
     }
@@ -498,6 +492,8 @@ public class MainActivity extends BridgeActivity {
     );
 
     updateCapacitorNavigationButtons();
+  
+    ${fullscreenMode?`try{ jepongSetupToolbarAutoHide(bar); }catch(Exception ignored){}`:""}
   }
 
   void attachCapacitorToolbar(
@@ -649,6 +645,7 @@ public class MainActivity extends BridgeActivity {
   }
 
   ${fullscreenMode?fullscreenJavaMethods():""}
+  ${fullscreenMode?fullscreenDispatchTouchEvent():""}
   ${fullscreenMode?fullscreenChromeClientDelegate():""}
   ${fullscreenMode?`
   @Override
@@ -1006,12 +1003,6 @@ public class MainActivity extends CordovaActivity {
         );
       }
       ${fullscreenMode?`
-      jepongBuildSidePanel(
-        new Runnable(){ public void run(){ if(w!=null&&w.canGoBack()) w.goBack(); } },
-        new Runnable(){ public void run(){ if(w!=null&&w.canGoForward()) w.goForward(); } },
-        new Runnable(){ public void run(){ if(w!=null) w.loadUrl(HOME); } },
-        new Runnable(){ public void run(){ if(w!=null) w.reload(); } },
-        new Runnable(){ public void run(){ shareCordovaUrl(); } });
       jepongAttachFullscreenVideoSupport(w);
       `:""}
     }
@@ -1215,6 +1206,8 @@ public class MainActivity extends CordovaActivity {
     );
 
     updateCordovaNavigationButtons();
+  
+    ${fullscreenMode?`try{ jepongSetupToolbarAutoHide(bar); }catch(Exception ignored){}`:""}
   }
 
   void attachCordovaToolbar(
@@ -1366,6 +1359,7 @@ public class MainActivity extends CordovaActivity {
   }
 
   ${fullscreenMode?fullscreenJavaMethods():""}
+  ${fullscreenMode?fullscreenDispatchTouchEvent():""}
   ${fullscreenMode?fullscreenChromeClientDelegate():""}
   ${fullscreenMode?`
   @Override
