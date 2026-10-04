@@ -56,7 +56,7 @@ export function fullscreenJavaMethods() {
     FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(
       FrameLayout.LayoutParams.WRAP_CONTENT,
       FrameLayout.LayoutParams.WRAP_CONTENT,
-      Gravity.END|Gravity.CENTER_VERTICAL);
+      Gravity.START|Gravity.CENTER_VERTICAL);
     addContentView(panel,lp);
     jepongSidePanel=panel;
     jepongUiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
