@@ -37,15 +37,22 @@ function patchManifest(){
    if(!xml.includes('android.permission.BLUETOOTH_ADMIN')) lines.push('    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />');
  }
  if(lines.length) xml=xml.replace(/<application\b/,`${lines.join('\n')}\n\n    <application`);
+ const tv=cfg.tvOptimized===true;
+ if(tv && !xml.includes('android.hardware.touchscreen')){
+   xml=xml.replace(/<application\b/,'    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />\n\n    <application');
+ }
  xml=xml.replace(/<application\b[^>]*>/s,tag=>{
    tag=setAttr(tag,'android:icon','@drawable/app_icon');
    tag=setAttr(tag,'android:roundIcon','@drawable/app_icon');
-   tag=setAttr(tag,'android:hardwareAccelerated',cfg.renderMode==='software'?'false':'true');
+   tag=setAttr(tag,'android:hardwareAccelerated',tv?'true':(cfg.renderMode==='software'?'false':'true'));
    tag=setAttr(tag,'android:usesCleartextTraffic','true');
+   if(tv) tag=setAttr(tag,'android:banner','@drawable/app_banner');
    if(cfg.oneSignalAppId) tag=setAttr(tag,'android:name','.JepongApplication');
    return tag;
  });
- const orientation=cfg.orientation==='portrait'?'portrait':cfg.orientation==='landscape'?'landscape':'unspecified';
+ // TV mode forces landscape: TVs are landscape displays and a portrait
+ // activity would render letterboxed and unusable with a D-pad remote.
+ const orientation=tv?'landscape':(cfg.orientation==='portrait'?'portrait':cfg.orientation==='landscape'?'landscape':'unspecified');
 
  const requiredConfigChanges=[
    'keyboard',
@@ -92,6 +99,13 @@ function patchManifest(){
      return tag;
    }
  );
+ // Leanback launcher entry so the app appears on Android TV / Google TV home.
+ if(tv && !xml.includes('android.intent.category.LEANBACK_LAUNCHER')){
+   xml=xml.replace(
+     /<category android:name="android.intent.category.LAUNCHER" \/>/,
+     '<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />'
+   );
+ }
  fs.writeFileSync(manifestPath,xml);
 }
 function writeBranding(){
@@ -99,6 +113,24 @@ function writeBranding(){
  const icon=brandedAsset(cfg,'icon'), splash=brandedAsset(cfg,'splash');
  write(path.join(res,`app_icon.${icon.ext}`),icon.buffer);
  write(path.join(res,`app_splash.${splash.ext}`),splash.buffer);
+ if(cfg.tvOptimized===true){
+   const drawDir=path.join(appRoot,'src/main/res/drawable'); mkdir(drawDir);
+   write(path.join(drawDir,'app_banner.xml'),
+`<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#111827" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/app_icon"
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp" />
+</layer-list>
+`);
+ }
 }
 function injectDependency(dep){
  const candidates=[path.join(appRoot,'build.gradle'),path.join(appRoot,'build.gradle.kts')];
