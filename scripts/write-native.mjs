@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { write, mkdir, escXml, javaString, brandedAsset } from './common.mjs';
+import { FULLSCREEN_JAVA_FIELDS, fullscreenJavaMethods } from './fullscreen-mode.mjs';
 
 const perms = {
   camera: ['android.permission.CAMERA'],
@@ -250,12 +251,16 @@ function webViewActivity(cfg) {
   const navigationToolbar=controls.includes('navigationToolbar');
   const externalLinks=controls.includes('externalLinks');
   const downloadManager=controls.includes('downloadManager');
+  // Fullscreen mode: bottom toolbar hidden, nav buttons float on the side
+  // edge (auto-hide), and video fullscreen playback works.
+  const fullscreenMode=cfg.fullscreenMode===true;
+  const showBottomBar=navigationToolbar&&!fullscreenMode;
   const cameraAllowed=(cfg.permissions||[]).includes('camera');
   const microphoneAllowed=(cfg.permissions||[]).includes('microphone');
   const locationAllowed=(cfg.permissions||[]).includes('location');
   const filesAllowed=(cfg.permissions||[]).includes('files');
   const layer = cfg.renderMode === 'software' ? 'View.LAYER_TYPE_SOFTWARE' : cfg.renderMode === 'hardware' ? 'View.LAYER_TYPE_HARDWARE' : 'View.LAYER_TYPE_NONE';
-  const nativeLayout=navigationToolbar
+  const nativeLayout=showBottomBar
     ? `web=new WebView(this);
     LinearLayout shell=new LinearLayout(this);
     shell.setOrientation(LinearLayout.VERTICAL);
@@ -277,14 +282,16 @@ function webViewActivity(cfg) {
     );
     setContentView(shell);`
     : `web=new WebView(this); setContentView(web);`;
-  return `package ${cfg.packageName};\n\nimport android.Manifest;\nimport android.app.*;\nimport android.os.*;\nimport android.graphics.Color;\nimport android.net.*;\nimport android.view.*;\nimport android.webkit.*;\nimport android.content.*;\nimport android.content.pm.PackageManager;\nimport android.widget.*;\nimport java.util.*;\n\npublic class MainActivity extends Activity {\n  WebView web; Button backButton; Button forwardButton; float downY; ValueCallback<Uri[]> pending; PermissionRequest pendingWebPermissionRequest; String pendingLocationOrigin; GeolocationPermissions.Callback pendingLocationCallback; boolean started=false; final String HOME=${javaString(cfg.websiteUrl)};\n  final boolean CAMERA_ENABLED=${cameraAllowed};\n  final boolean MICROPHONE_ENABLED=${microphoneAllowed};\n  final boolean LOCATION_ENABLED=${locationAllowed};\n  final boolean FILES_ENABLED=${filesAllowed};\n  final boolean NATIVE_NAVIGATION_TOOLBAR_ENABLED=${navigationToolbar};\n  final boolean NATIVE_EXTERNAL_LINKS_ENABLED=${externalLinks};\n  final boolean NATIVE_DOWNLOAD_MANAGER_ENABLED=${downloadManager};\n  @Override public void onCreate(Bundle b){ super.onCreate(b); ${transparent ? 'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}' : ''} begin(); }\n  ${splashMethods(cfg)}\n  void startBrowser(){ if(started)return; started=true; ${nativeLayout} web.setBackgroundColor(Color.rgb(17,24,39)); web.setLayerType(${layer}, null);\n    WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setAllowFileAccess(false); s.setAllowContentAccess(true); s.setLoadWithOverviewMode(true); s.setUseWideViewPort(true); s.setBuiltInZoomControls(${zoom}); s.setDisplayZoomControls(false); s.setSupportZoom(${zoom});\n    web.setVerticalScrollBarEnabled(${!hideBars}); web.setHorizontalScrollBarEnabled(${!hideBars}); ${noCopy ? 'web.setLongClickable(false); web.setOnLongClickListener(v->true);' : ''}\n    web.setWebViewClient(new WebViewClient(){\n      @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r){ Uri u=r.getUrl(); ${block ? 'if(isBlocked(u)) return true; try{ Uri home=Uri.parse(HOME); if(!Objects.equals(home.getHost(),u.getHost())) { startActivity(new Intent(Intent.ACTION_VIEW,u)); return true; }}catch(Exception ignored){}' : ''} ${externalLinks ? 'if(r.hasGesture() && shouldOpenExternally(u)){ openExternalUrl(u); return true; }' : ''} return false; }\n      @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r){ ${block ? 'if(isBlocked(r.getUrl())) return new WebResourceResponse("text/plain","utf-8",null);' : ''} return super.shouldInterceptRequest(v,r); }\n      @Override public void onPageFinished(WebView v,String url){ super.onPageFinished(v,url); updateNativeNavigationButtons(); }\n      @Override public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e){ if(r.isForMainFrame()) v.loadUrl("file:///android_asset/offline.html"); }\n    });\n    web.setWebChromeClient(new WebChromeClient(){\n      @Override public void onPermissionRequest(PermissionRequest req){\n        runOnUiThread(()->{\n          if(req==null)return;\n          String[] allowed=filterWebPermissionResources(req.getResources());\n          ArrayList<String> missing=missingWebPermissions(req.getResources());\n          if(allowed.length==0 && missing.isEmpty()){ req.deny(); return; }\n          if(missing.isEmpty()){ req.grant(allowed); return; }\n          if(pendingWebPermissionRequest!=null){ try{ pendingWebPermissionRequest.deny(); }catch(Exception ignored){} }\n          pendingWebPermissionRequest=req;\n          requestPermissions(missing.toArray(new String[0]),701);\n        });\n      }\n      @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback cb){\n        if(!LOCATION_ENABLED){ cb.invoke(origin,false,false); return; }\n        if(hasEitherLocationPermission()){ cb.invoke(origin,true,false); return; }\n        if(pendingLocationCallback!=null){ try{ pendingLocationCallback.invoke(pendingLocationOrigin,false,false); }catch(Exception ignored){} }\n        pendingLocationOrigin=origin;\n        pendingLocationCallback=cb;\n        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},702);\n      }\n      @Override public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb, FileChooserParams p){\n        if(!FILES_ENABLED){\n          cb.onReceiveValue(null);\n          return true;\n        }\n        try{\n          if(pending!=null) pending.onReceiveValue(null);\n          pending=cb;\n          startActivityForResult(p.createIntent(),901);\n          return true;\n        }catch(Exception ex){\n          pending=null;\n          cb.onReceiveValue(null);\n          return true;\n        }\n      }\n    });\n    ${downloadManager ? 'web.setDownloadListener((url,userAgent,contentDisposition,mimeType,contentLength)->startNativeDownload(url,userAgent,contentDisposition,mimeType));' : ''}\n    ${pull ? 'web.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) downY=e.getY(); if(e.getAction()==MotionEvent.ACTION_UP && web.getScrollY()==0 && e.getY()-downY>180){ web.reload(); return true;} return false;});' : ''}\n    web.loadUrl(HOME);\n
+  return `package ${cfg.packageName};\n\nimport android.Manifest;\nimport android.app.*;\nimport android.os.*;\nimport android.graphics.Color;\nimport android.net.*;\nimport android.view.*;\nimport android.webkit.*;\nimport android.content.*;\nimport android.content.pm.PackageManager;\nimport android.widget.*;\nimport java.util.*;\n\npublic class MainActivity extends Activity {\n  WebView web; Button backButton; Button forwardButton;${fullscreenMode?FULLSCREEN_JAVA_FIELDS:""} float downY; ValueCallback<Uri[]> pending; PermissionRequest pendingWebPermissionRequest; String pendingLocationOrigin; GeolocationPermissions.Callback pendingLocationCallback; boolean started=false; final String HOME=${javaString(cfg.websiteUrl)};\n  final boolean CAMERA_ENABLED=${cameraAllowed};\n  final boolean MICROPHONE_ENABLED=${microphoneAllowed};\n  final boolean LOCATION_ENABLED=${locationAllowed};\n  final boolean FILES_ENABLED=${filesAllowed};\n  final boolean NATIVE_NAVIGATION_TOOLBAR_ENABLED=${navigationToolbar};\n  final boolean NATIVE_EXTERNAL_LINKS_ENABLED=${externalLinks};\n  final boolean NATIVE_DOWNLOAD_MANAGER_ENABLED=${downloadManager};\n  @Override public void onCreate(Bundle b){ super.onCreate(b); ${transparent ? 'if(Build.VERSION.SDK_INT>=29){getWindow().setNavigationBarColor(Color.TRANSPARENT); getWindow().setStatusBarColor(Color.TRANSPARENT);}' : ''} begin(); }\n  ${splashMethods(cfg)}\n  void startBrowser(){ if(started)return; started=true; ${nativeLayout} web.setBackgroundColor(Color.rgb(17,24,39)); web.setLayerType(${layer}, null);\n    WebSettings s=web.getSettings(); s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true); s.setMediaPlaybackRequiresUserGesture(false); s.setAllowFileAccess(false); s.setAllowContentAccess(true); s.setLoadWithOverviewMode(true); s.setUseWideViewPort(true); s.setBuiltInZoomControls(${zoom}); s.setDisplayZoomControls(false); s.setSupportZoom(${zoom});\n    web.setVerticalScrollBarEnabled(${!hideBars}); web.setHorizontalScrollBarEnabled(${!hideBars}); ${noCopy ? 'web.setLongClickable(false); web.setOnLongClickListener(v->true);' : ''}\n    web.setWebViewClient(new WebViewClient(){\n      @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r){ Uri u=r.getUrl(); ${block ? 'if(isBlocked(u)) return true; try{ Uri home=Uri.parse(HOME); if(!Objects.equals(home.getHost(),u.getHost())) { startActivity(new Intent(Intent.ACTION_VIEW,u)); return true; }}catch(Exception ignored){}' : ''} ${externalLinks ? 'if(r.hasGesture() && shouldOpenExternally(u)){ openExternalUrl(u); return true; }' : ''} return false; }\n      @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r){ ${block ? 'if(isBlocked(r.getUrl())) return new WebResourceResponse("text/plain","utf-8",null);' : ''} return super.shouldInterceptRequest(v,r); }\n      @Override public void onPageFinished(WebView v,String url){ super.onPageFinished(v,url); updateNativeNavigationButtons(); }\n      @Override public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e){ if(r.isForMainFrame()) v.loadUrl("file:///android_asset/offline.html"); }\n    });\n    web.setWebChromeClient(new WebChromeClient(){\n      @Override public void onPermissionRequest(PermissionRequest req){\n        runOnUiThread(()->{\n          if(req==null)return;\n          String[] allowed=filterWebPermissionResources(req.getResources());\n          ArrayList<String> missing=missingWebPermissions(req.getResources());\n          if(allowed.length==0 && missing.isEmpty()){ req.deny(); return; }\n          if(missing.isEmpty()){ req.grant(allowed); return; }\n          if(pendingWebPermissionRequest!=null){ try{ pendingWebPermissionRequest.deny(); }catch(Exception ignored){} }\n          pendingWebPermissionRequest=req;\n          requestPermissions(missing.toArray(new String[0]),701);\n        });\n      }\n      @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback cb){\n        if(!LOCATION_ENABLED){ cb.invoke(origin,false,false); return; }\n        if(hasEitherLocationPermission()){ cb.invoke(origin,true,false); return; }\n        if(pendingLocationCallback!=null){ try{ pendingLocationCallback.invoke(pendingLocationOrigin,false,false); }catch(Exception ignored){} }\n        pendingLocationOrigin=origin;\n        pendingLocationCallback=cb;\n        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},702);\n      }\n${fullscreenMode ? '      @Override public void onShowCustomView(View view,CustomViewCallback callback){ jepongShowFullscreenVideo(view,callback); }\n      @Override public void onHideCustomView(){ jepongHideFullscreenVideo(); }\n' : ''}
+      @Override public boolean onShowFileChooser(WebView w, ValueCallback<Uri[]> cb, FileChooserParams p){\n        if(!FILES_ENABLED){\n          cb.onReceiveValue(null);\n          return true;\n        }\n        try{\n          if(pending!=null) pending.onReceiveValue(null);\n          pending=cb;\n          startActivityForResult(p.createIntent(),901);\n          return true;\n        }catch(Exception ex){\n          pending=null;\n          cb.onReceiveValue(null);\n          return true;\n        }\n      }\n    });\n    ${downloadManager ? 'web.setDownloadListener((url,userAgent,contentDisposition,mimeType,contentLength)->startNativeDownload(url,userAgent,contentDisposition,mimeType));' : ''}\n    ${pull ? 'web.setOnTouchListener((v,e)->{ if(e.getAction()==MotionEvent.ACTION_DOWN) downY=e.getY(); if(e.getAction()==MotionEvent.ACTION_UP && web.getScrollY()==0 && e.getY()-downY>180){ web.reload(); return true;} return false;});' : ''}\n    ${fullscreenMode ? 'jepongBuildSidePanel(()->{ if(web!=null&&web.canGoBack()) web.goBack(); },()->{ if(web!=null&&web.canGoForward()) web.goForward(); },()->{ if(web!=null) web.loadUrl(HOME); },()->{ if(web!=null) web.reload(); },()->shareCurrentUrl());' : ''}\nweb.loadUrl(HOME);\n
     updateNativeNavigationButtons();\n
   }\n
   int dp(int value){ return (int)(value*getResources().getDisplayMetrics().density+0.5f); }\n
   Button makeNativeNavButton(String label){ Button b=new Button(this); b.setText(label); b.setTextSize(10f); b.setAllCaps(false); b.setSingleLine(true); return b; }\n
   void addNativeNavButton(LinearLayout bar,Button button){ bar.addView(button,new LinearLayout.LayoutParams(0,LinearLayout.LayoutParams.MATCH_PARENT,1f)); }\n
   LinearLayout buildNativeNavigationBar(){ LinearLayout bar=new LinearLayout(this); bar.setOrientation(LinearLayout.HORIZONTAL); bar.setGravity(Gravity.CENTER); backButton=makeNativeNavButton("Back"); forwardButton=makeNativeNavButton("Next"); Button home=makeNativeNavButton("Home"); Button reload=makeNativeNavButton("Reload"); Button share=makeNativeNavButton("Share"); backButton.setOnClickListener(v->{ if(web!=null&&web.canGoBack()) web.goBack(); }); forwardButton.setOnClickListener(v->{ if(web!=null&&web.canGoForward()) web.goForward(); }); home.setOnClickListener(v->{ if(web!=null) web.loadUrl(HOME); }); reload.setOnClickListener(v->{ if(web!=null) web.reload(); }); share.setOnClickListener(v->shareCurrentUrl()); addNativeNavButton(bar,backButton); addNativeNavButton(bar,forwardButton); addNativeNavButton(bar,home); addNativeNavButton(bar,reload); addNativeNavButton(bar,share); return bar; }\n
-  void updateNativeNavigationButtons(){ if(!NATIVE_NAVIGATION_TOOLBAR_ENABLED)return; if(backButton!=null) backButton.setEnabled(web!=null&&web.canGoBack()); if(forwardButton!=null) forwardButton.setEnabled(web!=null&&web.canGoForward()); }\n
+  void updateNativeNavigationButtons(){ if(!NATIVE_NAVIGATION_TOOLBAR_ENABLED)return; if(backButton!=null) backButton.setEnabled(web!=null&&web.canGoBack()); if(forwardButton!=null) forwardButton.setEnabled(web!=null&&web.canGoForward()); }\n${fullscreenMode ? fullscreenJavaMethods() : ''}
+  ${fullscreenMode ? '@Override public boolean onKeyDown(int keyCode, KeyEvent event){ if(keyCode==KeyEvent.KEYCODE_BACK&&jepongIsFullscreenVideo()){ jepongHideFullscreenVideo(); return true; } return super.onKeyDown(keyCode,event); }' : ''}\n
   void shareCurrentUrl(){ if(web==null)return; String url=web.getUrl(); if(url==null||url.trim().isEmpty()) url=HOME; try{ Intent share=new Intent(Intent.ACTION_SEND); share.setType("text/plain"); share.putExtra(Intent.EXTRA_TEXT,url); startActivity(Intent.createChooser(share,"Share link")); }catch(Exception ignored){} }\n
   String normalizeHost(String host){ if(host==null)return ""; String value=host.toLowerCase(Locale.ROOT); if(value.startsWith("www.")) value=value.substring(4); return value; }\n  boolean isHomeHost(String candidate){ try{ String homeHost=Uri.parse(HOME).getHost(); if(homeHost==null||candidate==null)return false; homeHost=normalizeHost(homeHost); candidate=normalizeHost(candidate); return candidate.equals(homeHost)||candidate.endsWith("."+homeHost); }catch(Exception ignored){ return false; } }\n  boolean shouldOpenExternally(Uri u){ if(u==null)return false; String scheme=u.getScheme(); if(scheme==null)return false; if(!"http".equalsIgnoreCase(scheme)&&!"https".equalsIgnoreCase(scheme))return true; return !isHomeHost(u.getHost()); }\n  void openExternalUrl(Uri u){ if(u==null)return; try{ startActivity(new Intent(Intent.ACTION_VIEW,u)); }catch(Exception ignored){} }\n  void startNativeDownload(String url,String userAgent,String contentDisposition,String mimeType){\n    if(!NATIVE_DOWNLOAD_MANAGER_ENABLED||url==null||url.trim().isEmpty())return;\n    try{\n      Uri uri=Uri.parse(url);\n      String scheme=uri.getScheme();\n      if(scheme==null||(!"http".equalsIgnoreCase(scheme)&&!"https".equalsIgnoreCase(scheme))){ openExternalUrl(uri); return; }\n      DownloadManager.Request request=new DownloadManager.Request(uri);\n      String fileName=URLUtil.guessFileName(url,contentDisposition,mimeType);\n      if(mimeType!=null&&!mimeType.trim().isEmpty()) request.setMimeType(mimeType);\n      if(userAgent!=null&&!userAgent.trim().isEmpty()) request.addRequestHeader("User-Agent",userAgent);\n      String cookie=CookieManager.getInstance().getCookie(url);\n      if(cookie!=null&&!cookie.trim().isEmpty()) request.addRequestHeader("Cookie",cookie);\n      request.setTitle(fileName);\n      request.setDescription("Downloading file");\n      request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);\n      if(Build.VERSION.SDK_INT>=29){\n        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,fileName);\n      }else{\n        request.setDestinationInExternalFilesDir(this,Environment.DIRECTORY_DOWNLOADS,fileName);\n      }\n      DownloadManager manager=(DownloadManager)getSystemService(DOWNLOAD_SERVICE);\n      if(manager==null) throw new IllegalStateException("DownloadManager unavailable");\n      manager.enqueue(request);\n      Toast.makeText(this,"Download started",Toast.LENGTH_SHORT).show();\n    }catch(Exception error){\n      Toast.makeText(this,"Unable to start download",Toast.LENGTH_SHORT).show();\n    }\n  }\n  ArrayList<String> missingWebPermissions(String[] requested){\n    ArrayList<String> missing=new ArrayList<>();\n    if(requested==null)return missing;\n    for(String resource:requested){\n      if(PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) && CAMERA_ENABLED && !hasAndroidPermission(Manifest.permission.CAMERA) && !missing.contains(Manifest.permission.CAMERA)){ missing.add(Manifest.permission.CAMERA); }\n      if(PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource) && MICROPHONE_ENABLED && !hasAndroidPermission(Manifest.permission.RECORD_AUDIO) && !missing.contains(Manifest.permission.RECORD_AUDIO)){ missing.add(Manifest.permission.RECORD_AUDIO); }\n    }\n    return missing;\n  }\n  void handlePendingWebPermissionResult(){\n    PermissionRequest req=pendingWebPermissionRequest;\n    pendingWebPermissionRequest=null;\n    if(req==null)return;\n    try{\n      String[] allowed=filterWebPermissionResources(req.getResources());\n      if(allowed.length==0) req.deny();\n      else req.grant(allowed);\n    }catch(Exception ignored){}\n  }\n  void handlePendingLocationPermissionResult(){\n    GeolocationPermissions.Callback cb=pendingLocationCallback;\n    String origin=pendingLocationOrigin;\n    pendingLocationCallback=null;\n    pendingLocationOrigin=null;\n    if(cb==null)return;\n    try{ cb.invoke(origin,LOCATION_ENABLED && hasEitherLocationPermission(),false); }catch(Exception ignored){}\n  }\n  String[] filterWebPermissionResources(String[] requested){\n    ArrayList<String> allowed=new ArrayList<>();\n    if(requested==null) return new String[0];\n    for(String resource:requested){\n      if(\n        PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) &&\n        CAMERA_ENABLED &&\n        hasAndroidPermission(Manifest.permission.CAMERA)\n      ){\n        allowed.add(resource);\n      }\n      if(\n        PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource) &&\n        MICROPHONE_ENABLED &&\n        hasAndroidPermission(Manifest.permission.RECORD_AUDIO)\n      ){\n        allowed.add(resource);\n      }\n    }\n    return allowed.toArray(new String[0]);\n  }\n  boolean hasAndroidPermission(String permission){\n    return Build.VERSION.SDK_INT<23 ||\n      checkSelfPermission(permission)==PackageManager.PERMISSION_GRANTED;\n  }\n  boolean hasEitherLocationPermission(){\n    return\n      hasAndroidPermission(Manifest.permission.ACCESS_FINE_LOCATION) ||\n      hasAndroidPermission(Manifest.permission.ACCESS_COARSE_LOCATION);\n  }\n  @Override protected void onActivityResult(int req,int result,Intent data){ super.onActivityResult(req,result,data); if(req==901 && pending!=null){ pending.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result,data)); pending=null; } }\n  boolean isBlocked(Uri u){ String h=u.getHost(); if(h==null)return false; String x=h.toLowerCase(Locale.ROOT); String[] bad={"doubleclick.net","googlesyndication.com","googleadservices.com","adnxs.com","taboola.com","outbrain.com"}; for(String b:bad) if(x.equals(b)||x.endsWith("."+b)) return true; return false; }\n  @Override public void onBackPressed(){ if(web!=null&&web.canGoBack()) web.goBack(); else super.onBackPressed(); }\n}\n`;
 }
@@ -339,6 +346,8 @@ function geckoActivity(cfg) {
     geckoControls.includes(
       'navigationToolbar'
     );
+
+  const fullscreenMode=cfg.fullscreenMode===true;
 
   const externalLinks=
     geckoControls.includes(
@@ -495,7 +504,7 @@ public class MainActivity extends Activity {
 
   final String HOME=${javaString(cfg.websiteUrl)};
 
-  final boolean NAVIGATION_TOOLBAR=${navigationToolbar};
+  final boolean NAVIGATION_TOOLBAR=${navigationToolbar&&!fullscreenMode};
   final boolean EXTERNAL_LINKS=${externalLinks};
   final boolean DOWNLOAD_MANAGER=${downloadManager};
   final boolean FILES_ENABLED=${filesEnabled};
@@ -537,6 +546,8 @@ public class MainActivity extends Activity {
 
   Button backButton;
   Button forwardButton;
+  ${fullscreenMode?FULLSCREEN_JAVA_FIELDS:""}
+  ${fullscreenMode?"boolean jepongGeckoFs=false;":""}
   Button homeButton;
   Button refreshButton;
   Button shareButton;
@@ -963,6 +974,23 @@ public class MainActivity extends Activity {
             "Browser process stopped. Tap Retry."
           );
         }
+
+        ${fullscreenMode?`
+        @Override
+        public void onFullScreen(
+          GeckoSession currentSession,
+          boolean fullScreen
+        ){
+          jepongGeckoFs=fullScreen;
+          if(fullScreen){
+            if(jepongSidePanel!=null) jepongSidePanel.setVisibility(View.GONE);
+            try{ getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
+          }else{
+            try{ getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
+            if(jepongSidePanel!=null&&jepongSideExpanded) jepongSidePanel.setVisibility(View.VISIBLE);
+          }
+        }
+        `:""}
       }
     );
 
@@ -1927,6 +1955,15 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams.MATCH_PARENT
       )
     );
+
+    ${fullscreenMode?`
+    jepongBuildSidePanel(
+      ()=>{ if(session!=null) session.goBack(); },
+      ()=>{ if(session!=null) session.goForward(); },
+      ()=>{ if(session!=null) session.loadUri(HOME); },
+      ()=>{ if(session!=null) session.reload(); },
+      ()->shareCurrentPage());
+    `:""}
 
     loader=
       new LinearLayout(this);
@@ -3798,6 +3835,14 @@ public class MainActivity extends Activity {
     }
   }
 
+  ${fullscreenMode?`
+  @Override
+  public boolean onKeyDown(int keyCode, KeyEvent event){
+    if(keyCode==KeyEvent.KEYCODE_BACK&&jepongGeckoFs){ try{ session.loadUri("javascript:document.exitFullscreen()"); }catch(Exception ignored){} return true; }
+    return super.onKeyDown(keyCode,event);
+  }
+`:""}
+${fullscreenMode?fullscreenJavaMethods():""}
   @Override
   public void onBackPressed(){
     if(
