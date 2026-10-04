@@ -50,6 +50,11 @@ export function validateConfig(config) {
     config.engine !== 'gecko'
   ) errors.push('APK size optimization is GeckoView-only');
 
+  if (
+    config.tvOptimized != null &&
+    typeof config.tvOptimized !== 'boolean'
+  ) errors.push('Invalid TV optimization value');
+
   if (config.oneSignalAppId && !/^[0-9a-fA-F-]{36}$/.test(config.oneSignalAppId)) errors.push('OneSignal App ID must be a UUID');
   for (const key of ['iconDataUrl', 'splashDataUrl']) {
     const value = config[key];
