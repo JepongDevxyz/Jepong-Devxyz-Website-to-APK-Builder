@@ -456,8 +456,6 @@ function collect(){
 
     tvOptimized:
       $('#tvOptimized').checked,
-    fullscreenMode:
-      $('#fullscreenMode').checked,
 
     oneSignalAppId:val('#oneSignalAppId'),
     offlineFallback:val('#offlineFallback'),
@@ -568,7 +566,6 @@ function updateSummary(){
   '#sizeOptimization',
   '#abiTarget',
   '#tvOptimized',
-  '#fullscreenMode',
   '#oneSignalAppId',
   '#offlineFallback'
 ].forEach(selector=>{
@@ -841,8 +838,6 @@ function applyConfig(config){
 
   $('#tvOptimized').checked=
     config.tvOptimized===true;
-  $('#fullscreenMode').checked=
-    config.fullscreenMode===true;
 
   updateSizeOptimizationUI();
 
@@ -1432,7 +1427,6 @@ $('#resetBtn').onclick=()=>{
     abiTarget:'arm64-v8a',
 
     tvOptimized:false,
-    fullscreenMode:false,
 
     oneSignalAppId:'',
 
