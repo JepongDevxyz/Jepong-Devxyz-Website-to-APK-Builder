@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadConfig, workDir, brandedAsset, mkdir, write, javaString } from './common.mjs';
 import { patchAndroidVersionMetadata } from './android-version-metadata.mjs';
 import { patchCrossEngineBrowserUx } from './patch-cross-engine-browser-ux.mjs';
-import { FULLSCREEN_JAVA_FIELDS, fullscreenJavaMethods, fullscreenChromeClientDelegate, fullscreenDispatchTouchEvent } from './fullscreen-mode.mjs';
+// Fullscreen mode removed per user request
 
 const args=process.argv.slice(2);
 const value=k=>{const i=args.indexOf(k); return i>=0?args[i+1]:''};
@@ -173,7 +173,7 @@ function activityBody(base){
 
  const navigationToolbar=
    selectedControls.includes('navigationToolbar');
- const fullscreenMode=cfg.fullscreenMode===true;
+ const fullscreenMode=false; // Fullscreen mode removed per user request
 
  const externalLinks=
    selectedControls.includes('externalLinks');
