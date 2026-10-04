@@ -303,11 +303,11 @@ public class MainActivity extends BridgeActivity {
       }
       ${fullscreenMode?`
       jepongBuildSidePanel(
-        ()=>{ if(w!=null&&w.canGoBack()) w.goBack(); },
-        ()=>{ if(w!=null&&w.canGoForward()) w.goForward(); },
-        ()=>{ if(w!=null) w.loadUrl(HOME); },
-        ()=>{ if(w!=null) w.reload(); },
-        ()->shareCapacitorUrl());
+        new Runnable(){ public void run(){ if(w!=null&&w.canGoBack()) w.goBack(); } },
+        new Runnable(){ public void run(){ if(w!=null&&w.canGoForward()) w.goForward(); } },
+        new Runnable(){ public void run(){ if(w!=null) w.loadUrl(HOME); } },
+        new Runnable(){ public void run(){ if(w!=null) w.reload(); } },
+        new Runnable(){ public void run(){ shareCapacitorUrl(); } });
       jepongAttachFullscreenVideoSupport(w);
       `:""}
     }
@@ -1007,11 +1007,11 @@ public class MainActivity extends CordovaActivity {
       }
       ${fullscreenMode?`
       jepongBuildSidePanel(
-        ()=>{ if(w!=null&&w.canGoBack()) w.goBack(); },
-        ()=>{ if(w!=null&&w.canGoForward()) w.goForward(); },
-        ()=>{ if(w!=null) w.loadUrl(HOME); },
-        ()=>{ if(w!=null) w.reload(); },
-        ()->shareCordovaUrl());
+        new Runnable(){ public void run(){ if(w!=null&&w.canGoBack()) w.goBack(); } },
+        new Runnable(){ public void run(){ if(w!=null&&w.canGoForward()) w.goForward(); } },
+        new Runnable(){ public void run(){ if(w!=null) w.loadUrl(HOME); } },
+        new Runnable(){ public void run(){ if(w!=null) w.reload(); } },
+        new Runnable(){ public void run(){ shareCordovaUrl(); } });
       jepongAttachFullscreenVideoSupport(w);
       `:""}
     }
