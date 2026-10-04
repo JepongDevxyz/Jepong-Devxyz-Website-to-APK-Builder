@@ -55,11 +55,6 @@ export function validateConfig(config) {
     typeof config.tvOptimized !== 'boolean'
   ) errors.push('Invalid TV optimization value');
 
-  if (
-    config.fullscreenMode != null &&
-    typeof config.fullscreenMode !== 'boolean'
-  ) errors.push('Invalid fullscreen mode value');
-
   if (config.oneSignalAppId && !/^[0-9a-fA-F-]{36}$/.test(config.oneSignalAppId)) errors.push('OneSignal App ID must be a UUID');
   for (const key of ['iconDataUrl', 'splashDataUrl']) {
     const value = config[key];
