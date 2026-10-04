@@ -506,7 +506,7 @@ public class MainActivity extends Activity {
 
   final String HOME=${javaString(cfg.websiteUrl)};
 
-  final boolean NAVIGATION_TOOLBAR=${navigationToolbar&&!fullscreenMode};
+  final boolean NAVIGATION_TOOLBAR=${navigationToolbar};
   final boolean EXTERNAL_LINKS=${externalLinks};
   final boolean DOWNLOAD_MANAGER=${downloadManager};
   final boolean FILES_ENABLED=${filesEnabled};
