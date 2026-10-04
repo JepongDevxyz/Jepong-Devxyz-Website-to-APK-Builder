@@ -36,18 +36,18 @@ export function fullscreenJavaMethods() {
     int pad=jepongDp(4);
     panel.setPadding(pad,pad,pad,pad);
     Button handle=jepongSideBtn("»");
-    handle.setOnClickListener(v->jepongToggleSidePanel());
+    handle.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongToggleSidePanel(); } });
     panel.addView(handle);
     Button bBack=jepongSideBtn("‹");
-    bBack.setOnClickListener(v->{ jepongScheduleAutoHide(); onBack.run(); });
+    bBack.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onBack.run(); } });
     Button bFwd=jepongSideBtn("›");
-    bFwd.setOnClickListener(v->{ jepongScheduleAutoHide(); onForward.run(); });
+    bFwd.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onForward.run(); } });
     Button bHome=jepongSideBtn("Home");
-    bHome.setOnClickListener(v->{ jepongScheduleAutoHide(); onHome.run(); });
+    bHome.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onHome.run(); } });
     Button bReload=jepongSideBtn("Reload");
-    bReload.setOnClickListener(v->{ jepongScheduleAutoHide(); onReload.run(); });
+    bReload.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onReload.run(); } });
     Button bShare=jepongSideBtn("Share");
-    bShare.setOnClickListener(v->{ jepongScheduleAutoHide(); onShare.run(); });
+    bShare.setOnClickListener(new View.OnClickListener(){ public void onClick(View v){ jepongScheduleAutoHide(); onShare.run(); } });
     panel.addView(bBack);
     panel.addView(bFwd);
     panel.addView(bHome);
@@ -60,11 +60,11 @@ export function fullscreenJavaMethods() {
     addContentView(panel,lp);
     jepongSidePanel=panel;
     jepongUiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
-    jepongAutoHideRunnable=()->{
+    jepongAutoHideRunnable=new Runnable(){ public void run(){
       if(jepongSidePanel!=null&&jepongSideExpanded&&jepongFullscreenView==null){
         jepongToggleSidePanel();
       }
-    };
+    } };
     jepongScheduleAutoHide();
   }
   void jepongScheduleAutoHide(){
