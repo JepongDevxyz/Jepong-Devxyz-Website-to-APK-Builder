@@ -985,11 +985,15 @@ public class MainActivity extends Activity {
         ){
           jepongGeckoFs=fullScreen;
           if(fullScreen){
-            if(jepongSidePanel!=null) jepongSidePanel.setVisibility(View.GONE);
+            jepongVideoFullscreen=true;
+            if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.GONE);
+            if(jepongUiHandler!=null&&jepongUiHideRunnable!=null) jepongUiHandler.removeCallbacks(jepongUiHideRunnable);
+            jepongSetupImmersive();
             try{ getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
           }else{
+            jepongVideoFullscreen=false;
             try{ getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }catch(Exception ignored){}
-            if(jepongSidePanel!=null&&jepongSideExpanded) jepongSidePanel.setVisibility(View.VISIBLE);
+            jepongSetupImmersive();
           }
         }
         `:""}
