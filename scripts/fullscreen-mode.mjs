@@ -19,6 +19,11 @@ export function fullscreenJavaMethods() {
   return `
   void jepongSetupImmersive(){
     try{
+      // Edge-to-edge: allow content under system bars (fixes landscape gaps)
+      getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+      // Transparent status bar: syncs with website content color
+      getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+      getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
       getWindow().getDecorView().setSystemUiVisibility(
         View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -36,8 +41,12 @@ export function fullscreenJavaMethods() {
         jepongToolbarView.setVisibility(View.GONE);
       }
     } };
-    if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.GONE);
+    // Start VISIBLE (default), then auto-hide after 3s idle
+    if(jepongToolbarView!=null) jepongToolbarView.setVisibility(View.VISIBLE);
     jepongSetupImmersive();
+    if(jepongUiHandler!=null&&jepongUiHideRunnable!=null){
+      jepongUiHandler.postDelayed(jepongUiHideRunnable,3000);
+    }
   }
   void jepongShowToolbar(){
     if(jepongVideoFullscreen) return;
