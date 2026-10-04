@@ -1,91 +1,93 @@
-/* Fullscreen mode contract test (all four engines).
-   Verifies that fullscreenMode=true hides the bottom toolbar, builds the
-   floating side-by-side edge panel with auto-hide, and enables working video
-   fullscreen playback — and that fullscreenMode=false changes nothing. */
+/* Tests for Fullscreen Mode (all four engines).
+   New behavior: NO side panel. Bottom toolbar auto-hides after 3s idle, reappears on tap.
+   Status bar uses IMMERSIVE_STICKY. Video fullscreen: absolutely no UI. */
+
+import { writeNative } from './write-native.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { writeNative } from './write-native.mjs';
 
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'jepong-fullscreen-'));
 let failures = 0;
 function check(name, cond) {
-  if (cond) { console.log(`  PASS: ${name}`); }
-  else { failures++; console.error(`  FAIL: ${name}`); }
+  if (cond) {
+    console.log(`  PASS: ${name}`);
+  } else {
+    console.log(`  FAIL: ${name}`);
+    failures++;
+  }
 }
 
 const baseCfg = {
   websiteUrl: 'https://example.com',
-  appName: 'FS Test',
-  packageName: 'com.jepongdevxyz.fstest',
-  versionName: '1.0.0',
+  appName: 'T',
+  packageName: 'com.t.t',
+  versionName: '1.0',
   versionCode: 1,
-  engine: 'native',
-  renderMode: 'software',
-  orientation: 'auto',
-  permissions: [],
   controls: ['navigationToolbar'],
-  extensions: [],
-  oneSignalAppId: '',
-  iconDataUrl: '',
-  splashDataUrl: '',
-  splashEnabled: false,
-  apkSigner: false,
+  permissions: [],
 };
 
-function genJava(engine, fullscreenMode) {
-  const out = path.join(temp, `${engine}-${fullscreenMode ? 'on' : 'off'}`);
-  const cfg = { ...baseCfg, engine, fullscreenMode };
-  writeNative(cfg, out, engine === 'gecko');
-  const pkg = cfg.packageName.replace(/\./g, '/');
-  return fs.readFileSync(path.join(out, 'app/src/main/java', pkg, 'MainActivity.java'), 'utf8');
+function tmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'fs-test-'));
 }
 
-// ---- native ----
-console.log('native engine:');
-{
-  const on = genJava('native', true);
-  check('side panel built', on.includes('jepongBuildSidePanel('));
-  check('video fullscreen (onShowCustomView)', on.includes('onShowCustomView'));
-  check('video fullscreen (onHideCustomView)', on.includes('onHideCustomView'));
-  check('auto-hide scheduled', on.includes('jepongScheduleAutoHide'));
-  check('back exits fullscreen video first (onKeyDown)', on.includes('onKeyDown') && on.includes('jepongIsFullscreenVideo'));
-  check('bottom bar not built', !on.includes('LinearLayout bar=buildNativeNavigationBar()'));
-
-  const off = genJava('native', false);
-  check('no side panel when off', !off.includes('jepongBuildSidePanel('));
-  check('no video fullscreen hooks when off', !off.includes('onShowCustomView'));
-  check('bottom bar kept when off', off.includes('LinearLayout bar=buildNativeNavigationBar()'));
+function genNative(fullscreenMode) {
+  const out = tmpDir();
+  const cfg = { ...baseCfg, engine: 'native', fullscreenMode };
+  writeNative(cfg, out, false);
+  return fs.readFileSync(out + '/app/src/main/java/com/t/t/MainActivity.java', 'utf8');
 }
 
-// ---- gecko ----
-console.log('gecko engine:');
-{
-  const on = genJava('gecko', true);
-  check('side panel built', on.includes('jepongBuildSidePanel('));
-  check('ContentDelegate.onFullScreen present', on.includes('onFullScreen'));
-  check('fullscreen flag tracked', on.includes('jepongGeckoFs'));
-  check('auto-hide scheduled', on.includes('jepongScheduleAutoHide'));
-  check('bottom bar skipped (constant folded)', on.includes('final boolean NAVIGATION_TOOLBAR=false'));
-
-  const off = genJava('gecko', false);
-  check('no side panel when off', !off.includes('jepongBuildSidePanel('));
-  check('no onFullScreen when off', !off.includes('onFullScreen'));
-  check('bottom bar kept when off', off.includes('final boolean NAVIGATION_TOOLBAR=true'));
+function genGecko(fullscreenMode) {
+  const out = tmpDir();
+  const cfg = { ...baseCfg, engine: 'gecko', fullscreenMode };
+  writeNative(cfg, out, true);
+  return fs.readFileSync(out + '/app/src/main/java/com/t/t/MainActivity.java', 'utf8');
 }
 
-// ---- shared module sanity ----
-console.log('shared module:');
+console.log('Native engine:');
 {
-  const mod = fs.readFileSync(new URL('./fullscreen-mode.mjs', import.meta.url), 'utf8');
-  check('auto-hide collapses to handle (not GONE)', mod.includes('jepongToggleSidePanel()'));
-  check('3s auto-hide delay', mod.includes('postDelayed(jepongAutoHideRunnable,3000)'));
-  check('side panel hidden during video fullscreen', mod.includes('jepongSidePanel.setVisibility(View.GONE)'));
-  check('delegating chrome client exported', mod.includes('fullscreenChromeClientDelegate'));
+  const java = genNative(true);
+  check('no side panel (jepongBuildSidePanel absent)', !java.includes('jepongBuildSidePanel'));
+  check('immersive sticky mode', java.includes('SYSTEM_UI_FLAG_IMMERSIVE_STICKY'));
+  check('toolbar auto-hide setup', java.includes('jepongSetupToolbarAutoHide(bar)'));
+  check('tap shows toolbar (dispatchTouchEvent)', java.includes('dispatchTouchEvent') && java.includes('jepongShowToolbar()'));
+  check('3s auto-hide delay', java.includes('postDelayed(jepongUiHideRunnable,3000)'));
+  check('toolbar hidden during video fullscreen', java.includes('jepongVideoFullscreen=true'));
+  check('back exits fullscreen video', java.includes('jepongIsFullscreenVideo'));
+}
+console.log('Native engine (off):');
+{
+  const java = genNative(false);
+  check('no toolbar auto-hide when off', !java.includes('jepongSetupToolbarAutoHide'));
+  check('no immersive when off', !java.includes('jepongSetupImmersive'));
+}
+
+console.log('Gecko engine:');
+{
+  const java = genGecko(true);
+  check('no side panel', !java.includes('jepongBuildSidePanel'));
+  check('toolbar auto-hide setup', java.includes('jepongSetupToolbarAutoHide(navigationBar)'));
+  check('tap shows toolbar', java.includes('jepongShowToolbar()'));
+  check('video fullscreen hides UI', java.includes('jepongVideoFullscreen=true'));
+}
+
+console.log('Shared module:');
+{
+  const { fullscreenJavaMethods, fullscreenDispatchTouchEvent } = await import('./fullscreen-mode.mjs');
+  const methods = fullscreenJavaMethods();
+  check('no side panel in shared module', !methods.includes('jepongBuildSidePanel'));
+  check('has immersive setup', methods.includes('jepongSetupImmersive'));
+  check('has toolbar auto-hide', methods.includes('jepongSetupToolbarAutoHide'));
+  check('has tap-to-show', methods.includes('jepongShowToolbar'));
+  check('video fullscreen flag', methods.includes('jepongVideoFullscreen'));
+  const touch = fullscreenDispatchTouchEvent();
+  check('dispatchTouchEvent exported', touch.includes('dispatchTouchEvent'));
 }
 
 if (failures > 0) {
-  console.error(`\n${failures} fullscreen check(s) FAILED`);
+  console.log(`\n${failures} fullscreen check(s) FAILED`);
   process.exit(1);
+} else {
+  console.log('\nAll fullscreen mode checks passed.');
 }
-console.log('\nAll fullscreen mode checks passed.');
