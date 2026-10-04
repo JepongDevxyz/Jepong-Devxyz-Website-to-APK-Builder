@@ -36,6 +36,29 @@ function writeBranding(cfg,out){
   write(path.join(res,`app_splash.${splash.ext}`), splash.buffer);
 }
 
+/* Android TV banner: a layer-list drawable (320x180dp on the Leanback
+   launcher) with the brand-dark background and the app icon centered.
+   Pure XML — no image processing needed, works on every engine. */
+export function writeTvBanner(out){
+  const res=path.join(out,'app/src/main/res/drawable');
+  mkdir(res);
+  write(path.join(res,'app_banner.xml'),
+`<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#111827" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/app_icon"
+        android:gravity="center"
+        android:width="120dp"
+        android:height="120dp" />
+</layer-list>
+`);
+}
+
 export function writeNative(cfg, out, gecko=false) {
   mkdir(out);
   const pkg = cfg.packageName;
@@ -86,7 +109,18 @@ export function writeNative(cfg, out, gecko=false) {
   const orientation = cfg.orientation === 'portrait' ? 'portrait' : cfg.orientation === 'landscape' ? 'landscape' : 'unspecified';
   const hardware = cfg.renderMode === 'software' ? 'false' : 'true';
   const appClass = cfg.oneSignalAppId ? `android:name=".JepongApplication"` : '';
-  write(path.join(out, 'app/src/main/AndroidManifest.xml'), `<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n${manifestPermissions(cfg)}\n    <application ${appClass} android:allowBackup="false" android:usesCleartextTraffic="true" android:hardwareAccelerated="${hardware}" android:theme="@style/AppTheme" android:label="${escXml(cfg.appName)}" android:icon="@drawable/app_icon" android:roundIcon="@drawable/app_icon">\n        <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="${orientation}" android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>\n    </application>\n</manifest>\n`);
+  // Android TV / Google TV optimization: declare touchscreen as optional so the
+  // app is installable on TV devices, expose a Leanback banner + launcher
+  // entry, force landscape (TVs are landscape) and keep hardware acceleration
+  // on so rendering stays sharp at TV resolutions.
+  const tv = cfg.tvOptimized === true;
+  const tvUsesFeature = tv ? '\n    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />' : '';
+  const tvBannerAttr = tv ? ' android:banner="@drawable/app_banner"' : '';
+  const tvLeanbackCategory = tv ? '\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />' : '';
+  const finalOrientation = tv ? 'landscape' : orientation;
+  const finalHardware = tv ? 'true' : hardware;
+  write(path.join(out, 'app/src/main/AndroidManifest.xml'), `<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n${manifestPermissions(cfg)}${tvUsesFeature}\n    <application ${appClass} android:allowBackup="false" android:usesCleartextTraffic="true" android:hardwareAccelerated="${finalHardware}" android:theme="@style/AppTheme" android:label="${escXml(cfg.appName)}" android:icon="@drawable/app_icon" android:roundIcon="@drawable/app_icon"${tvBannerAttr}>\n        <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="${finalOrientation}" android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />${tvLeanbackCategory}\n            </intent-filter>\n        </activity>\n    </application>\n</manifest>\n`);
+  if (tv) writeTvBanner(out);
   write(path.join(out, 'app/src/main/res/values/styles.xml'), `<resources>\n<style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowLightStatusBar">false</item><item name="android:statusBarColor">#111827</item><item name="android:navigationBarColor">#111827</item><item name="android:windowBackground">#111827</item><item name="android:windowActionModeOverlay">true</item></style>\n</resources>`);
   writeBranding(cfg,out);
   write(path.join(out, 'app/src/main/assets/offline.html'), `<!doctype html><meta name="viewport" content="width=device-width"><style>body{font-family:system-ui;background:#111827;color:#fff;display:grid;place-items:center;height:100vh;margin:0;text-align:center}main{max-width:440px;padding:24px}</style><main><h1>${escXml(cfg.appName)}</h1><p>${escXml(cfg.offlineFallback || 'You appear to be offline. Check your connection and try again.')}</p></main>`);
